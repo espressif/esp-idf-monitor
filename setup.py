@@ -35,7 +35,11 @@ setup(
     url='https://github.com/espressif/esp-idf-monitor',
     packages=find_packages(),
     python_requires='>=3.7',
-    install_requires=['pyserial>=3.3', 'esp-coredump~=1.2'],
+    install_requires=[
+        'pyserial>=3.3',
+        'esp-coredump~=1.2',
+        'pyelftools',
+    ],
     extras_require={
         'dev': [
             'pre-commit',
