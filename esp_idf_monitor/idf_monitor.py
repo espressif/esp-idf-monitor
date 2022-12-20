@@ -33,26 +33,33 @@ from typing import Any, List, Optional, Type, Union
 
 import serial
 import serial.tools.list_ports
-# Windows console stuff
-from idf_monitor_base.ansi_color_converter import get_converter
-from idf_monitor_base.argument_parser import get_parser
-from idf_monitor_base.console_parser import ConsoleParser
-from idf_monitor_base.console_reader import ConsoleReader
-from idf_monitor_base.constants import (CTRL_C, CTRL_H, DEFAULT_PRINT_FILTER, DEFAULT_TOOLCHAIN_PREFIX,
-                                        ESPPORT_ENVIRON, EVENT_QUEUE_TIMEOUT, GDB_EXIT_TIMEOUT,
-                                        GDB_UART_CONTINUE_COMMAND, LAST_LINE_THREAD_INTERVAL, MAKEFLAGS_ENVIRON,
-                                        PANIC_DECODE_DISABLE, PANIC_IDLE, TAG_CMD, TAG_KEY, TAG_SERIAL,
-                                        TAG_SERIAL_FLUSH)
-from idf_monitor_base.coredump import COREDUMP_DECODE_INFO, CoreDump
-from idf_monitor_base.exceptions import SerialStopException
-from idf_monitor_base.gdbhelper import GDBHelper
-from idf_monitor_base.line_matcher import LineMatcher
-from idf_monitor_base.logger import Logger
-from idf_monitor_base.output_helpers import normal_print, yellow_print
-from idf_monitor_base.serial_handler import SerialHandler, SerialHandlerNoElf, run_make
-from idf_monitor_base.serial_reader import LinuxReader, SerialReader
-from idf_monitor_base.web_socket_client import WebSocketClient
 from serial.tools import miniterm
+
+# Windows console stuff
+from .idf_monitor_base.ansi_color_converter import get_converter
+from .idf_monitor_base.argument_parser import get_parser
+from .idf_monitor_base.console_parser import ConsoleParser
+from .idf_monitor_base.console_reader import ConsoleReader
+from .idf_monitor_base.constants import (CTRL_C, CTRL_H, DEFAULT_PRINT_FILTER,
+                                         DEFAULT_TOOLCHAIN_PREFIX,
+                                         ESPPORT_ENVIRON, EVENT_QUEUE_TIMEOUT,
+                                         GDB_EXIT_TIMEOUT,
+                                         GDB_UART_CONTINUE_COMMAND,
+                                         LAST_LINE_THREAD_INTERVAL,
+                                         MAKEFLAGS_ENVIRON,
+                                         PANIC_DECODE_DISABLE, PANIC_IDLE,
+                                         TAG_CMD, TAG_KEY, TAG_SERIAL,
+                                         TAG_SERIAL_FLUSH)
+from .idf_monitor_base.coredump import COREDUMP_DECODE_INFO, CoreDump
+from .idf_monitor_base.exceptions import SerialStopException
+from .idf_monitor_base.gdbhelper import GDBHelper
+from .idf_monitor_base.line_matcher import LineMatcher
+from .idf_monitor_base.logger import Logger
+from .idf_monitor_base.output_helpers import normal_print, yellow_print
+from .idf_monitor_base.serial_handler import (SerialHandler,
+                                              SerialHandlerNoElf, run_make)
+from .idf_monitor_base.serial_reader import LinuxReader, SerialReader
+from .idf_monitor_base.web_socket_client import WebSocketClient
 
 key_description = miniterm.key_description
 
@@ -371,7 +378,3 @@ def main() -> None:
     finally:
         if ws:
             ws.close()
-
-
-if __name__ == '__main__':
-    main()

@@ -1,0 +1,5 @@
+# IDF monitor test
+test/outputs
+
+esp_idf_monitor.egg-info
+.eggs

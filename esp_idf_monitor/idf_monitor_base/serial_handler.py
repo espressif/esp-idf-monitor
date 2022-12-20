@@ -15,8 +15,10 @@ from serial.tools import miniterm  # noqa: F401
 from .chip_specific_config import get_chip_config
 from .console_parser import ConsoleParser, prompt_next_action  # noqa: F401
 from .console_reader import ConsoleReader  # noqa: F401
-from .constants import (CMD_APP_FLASH, CMD_ENTER_BOOT, CMD_MAKE, CMD_OUTPUT_TOGGLE, CMD_RESET, CMD_STOP,
-                        CMD_TOGGLE_LOGGING, CMD_TOGGLE_TIMESTAMPS, PANIC_DECODE_DISABLE, PANIC_END, PANIC_IDLE,
+from .constants import (CMD_APP_FLASH, CMD_ENTER_BOOT, CMD_MAKE,
+                        CMD_OUTPUT_TOGGLE, CMD_RESET, CMD_STOP,
+                        CMD_TOGGLE_LOGGING, CMD_TOGGLE_TIMESTAMPS,
+                        PANIC_DECODE_DISABLE, PANIC_END, PANIC_IDLE,
                         PANIC_READING, PANIC_STACK_DUMP, PANIC_START)
 from .coredump import CoreDump
 from .exceptions import SerialStopException

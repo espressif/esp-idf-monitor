@@ -12,10 +12,10 @@ from io import open
 import serial
 
 try:
-    import idf_monitor
+    from esp_idf_monitor import idf_monitor
 except ImportError:
     sys.path.append('..')
-    import idf_monitor
+    from esp_idf_monitor import idf_monitor
 
 
 def monitor_serial_reader_state(serial_reader, file_to_create):

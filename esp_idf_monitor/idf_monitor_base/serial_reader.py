@@ -8,7 +8,8 @@ import time
 
 import serial
 
-from .constants import CHECK_ALIVE_FLAG_TIMEOUT, MINIMAL_EN_LOW_DELAY, RECONNECT_DELAY, TAG_SERIAL
+from .constants import (CHECK_ALIVE_FLAG_TIMEOUT, MINIMAL_EN_LOW_DELAY,
+                        RECONNECT_DELAY, TAG_SERIAL)
 from .output_helpers import red_print, yellow_print
 from .stoppable_thread import StoppableThread
 

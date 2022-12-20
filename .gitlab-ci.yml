@@ -1,0 +1,66 @@
+stages:
+  - codecheck
+  - test
+
+# WORKFLOW RULES
+# ------------------------------------------------------------------------------------------------------
+workflow:
+  rules:
+    - if: '$CI_PIPELINE_SOURCE == "merge_request_event"'
+    - if: '$CI_COMMIT_BRANCH && $CI_OPEN_MERGE_REQUESTS && $CI_PIPELINE_SOURCE == "push"'
+      when: never
+    - if: '$CI_COMMIT_BRANCH'
+# ------------------------------------------------------------------------------------------------------
+
+
+# TEMPLATES
+# ------------------------------------------------------------------------------------------------------
+.base_template:
+  image: python:3.7-bullseye
+  tags:
+    - build
+    - internet
+  before_script:
+    - pip install -e .[dev] --prefer-binary
+
+.idf_template:
+  image: espressif/idf:latest
+  tags:
+    - build
+    - internet
+  before_script:
+    - pip install -e .[dev] --prefer-binary
+# --------------------------------------------------------------------------------------------------
+
+
+# JOBS
+# ------------------------------------------------------------------------------------------------------
+
+# CODE CHECK BY PRE-COMMIT HOOKS
+pre-commit_hooks_MR:
+  extends: .base_template
+  stage: codecheck
+  script:
+    - apt-get update && apt-get install -y -q git
+    - git diff-tree --no-commit-id --name-only -r $CI_COMMIT_SHA | xargs pre-commit run --files
+  rules:
+    - if: '$CI_PIPELINE_SOURCE == "merge_request_event"'
+# ------------------------------------------------------------------------------------------------------
+
+# FORMATTING
+
+
+# TESTS
+
+test_idf_monitor:
+  extends: .base_template
+  stage: test
+  artifacts:
+    # save artifacts always in order to access results which were retried without consequent failure
+    when: always
+    paths:
+      - test/outputs/*
+    expire_in: 1 week
+  script:
+    - cd test
+    - ./run_test_idf_monitor.py

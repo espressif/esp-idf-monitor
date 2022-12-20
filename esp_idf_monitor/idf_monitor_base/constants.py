@@ -35,8 +35,6 @@ TAG_SERIAL = 1
 TAG_SERIAL_FLUSH = 2
 TAG_CMD = 3
 
-__version__ = '1.1'
-
 # paths to scripts
 PANIC_OUTPUT_DECODE_SCRIPT = os.path.join(os.path.dirname(__file__), '..', 'gdb_panic_server.py')
 
