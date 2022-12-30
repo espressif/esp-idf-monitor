@@ -1,8 +1,8 @@
 # SPDX-FileCopyrightText: 2015-2021 Espressif Systems (Shanghai) CO LTD
 # SPDX-License-Identifier: Apache-2.0
 
-import queue
-import subprocess
+import queue  # noqa: F401
+import subprocess  # noqa: F401
 import sys
 import time
 
@@ -71,7 +71,7 @@ class SerialReader(Reader):
                     data = b''
                     # self.serial.open() was successful before, therefore, this is an issue related to
                     # the disappearance of the device
-                    red_print(e)
+                    red_print(e.strerror)
                     yellow_print('Waiting for the device to reconnect', newline='')
                     self.serial.close()
                     while self.alive:  # so that exiting monitor works while waiting

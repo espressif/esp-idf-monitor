@@ -2,15 +2,15 @@
 # SPDX-License-Identifier: Apache-2.0
 import io
 import os
-import queue
+import queue  # noqa: F401
 import tempfile
 from contextlib import contextmanager, redirect_stdout
-from typing import Generator
+from typing import Generator, Optional  # noqa: F401
 
 from .constants import TAG_KEY
-from .logger import Logger
+from .logger import Logger  # noqa: F401
 from .output_helpers import yellow_print
-from .web_socket_client import WebSocketClient
+from .web_socket_client import WebSocketClient  # noqa: F401
 
 # coredump related messages
 COREDUMP_UART_START = b'================= CORE DUMP START ================='
@@ -29,7 +29,7 @@ COREDUMP_DECODE_INFO = 'info'
 
 class CoreDump:
     def __init__(self, decode_coredumps, event_queue, logger, websocket_client, elf_file):
-        # type: (str, queue.Queue, Logger, WebSocketClient, str) -> None
+        # type: (str, queue.Queue, Logger, Optional[WebSocketClient], str) -> None
 
         self._coredump_buffer = b''
         self._decode_coredumps = decode_coredumps

@@ -3,7 +3,7 @@
 
 import subprocess
 import sys
-from typing import BinaryIO, Callable, Optional, Union  # noqa: F401
+from typing import Optional  # noqa: F401
 
 # ANSI terminal codes (if changed, regular expressions in LineMatcher need to be updated)
 ANSI_RED = '\033[1;31m'

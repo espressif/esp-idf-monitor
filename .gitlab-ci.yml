@@ -24,7 +24,7 @@ workflow:
     - pip install -e .[dev] --prefer-binary
 
 .idf_template:
-  image: espressif/idf:latest
+  image: "espressif/idf:latest"
   tags:
     - build
     - internet
@@ -47,13 +47,10 @@ pre-commit_hooks_MR:
     - if: '$CI_PIPELINE_SOURCE == "merge_request_event"'
 # ------------------------------------------------------------------------------------------------------
 
-# FORMATTING
-
-
 # TESTS
 
 test_idf_monitor:
-  extends: .base_template
+  extends: .idf_template
   stage: test
   artifacts:
     # save artifacts always in order to access results which were retried without consequent failure

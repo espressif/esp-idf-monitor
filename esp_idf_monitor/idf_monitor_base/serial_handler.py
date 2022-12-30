@@ -7,7 +7,7 @@ import queue  # noqa: F401
 import re
 import subprocess
 import time
-from typing import Callable, Optional
+from typing import Callable, Optional  # noqa: F401
 
 import serial  # noqa: F401
 from serial.tools import miniterm  # noqa: F401
@@ -20,13 +20,13 @@ from .constants import (CMD_APP_FLASH, CMD_ENTER_BOOT, CMD_MAKE,
                         CMD_TOGGLE_LOGGING, CMD_TOGGLE_TIMESTAMPS,
                         PANIC_DECODE_DISABLE, PANIC_END, PANIC_IDLE,
                         PANIC_READING, PANIC_STACK_DUMP, PANIC_START)
-from .coredump import CoreDump
+from .coredump import CoreDump  # noqa: F401
 from .exceptions import SerialStopException
-from .gdbhelper import GDBHelper
-from .line_matcher import LineMatcher
-from .logger import Logger
+from .gdbhelper import GDBHelper  # noqa: F401
+from .line_matcher import LineMatcher  # noqa: F401
+from .logger import Logger  # noqa: F401
 from .output_helpers import yellow_print
-from .serial_reader import Reader
+from .serial_reader import Reader  # noqa: F401
 
 
 def get_sha256(filename, block_size=65536):  # type: (str, int) -> str
@@ -164,9 +164,9 @@ class SerialHandler:
             return
         file_sha256_flashed = file_sha256_flashed_match.group('sha256_flashed')
         if not os.path.exists(self.elf_file):
-            yellow_print(f'ELF file not found. '
-                         f"You need to build & flash the project before running 'monitor', "
-                         f'and the binary on the device must match the one in the build directory exactly. ')
+            yellow_print('ELF file not found. '
+                         "You need to build & flash the project before running 'monitor', "
+                         'and the binary on the device must match the one in the build directory exactly. ')
         else:
             file_sha256_build = get_sha256(self.elf_file)
             if file_sha256_flashed not in f'{file_sha256_build}':

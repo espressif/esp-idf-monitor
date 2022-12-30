@@ -5,8 +5,8 @@ import ctypes
 import os
 import re
 import sys
-from io import TextIOBase
-from typing import Any, Optional, TextIO, Union
+from io import TextIOBase  # noqa: F401
+from typing import Any, Optional, TextIO, Union  # noqa: F401
 
 from .output_helpers import ANSI_NORMAL
 

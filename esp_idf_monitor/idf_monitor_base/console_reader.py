@@ -3,12 +3,12 @@
 
 
 import os
-import queue
+import queue  # noqa: F401
 import time
 
-from serial.tools.miniterm import Console
+from serial.tools.miniterm import Console  # noqa: F401
 
-from .console_parser import ConsoleParser
+from .console_parser import ConsoleParser  # noqa: F401
 from .constants import CMD_STOP, TAG_CMD
 from .stoppable_thread import StoppableThread
 

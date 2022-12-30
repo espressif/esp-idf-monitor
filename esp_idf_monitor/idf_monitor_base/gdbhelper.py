@@ -5,16 +5,17 @@ import re
 import subprocess
 import sys
 import tempfile
+from typing import Optional  # noqa: F401
 
 from .constants import PANIC_OUTPUT_DECODE_SCRIPT
-from .logger import Logger
+from .logger import Logger  # noqa: F401
 from .output_helpers import normal_print, red_print, yellow_print
-from .web_socket_client import WebSocketClient
+from .web_socket_client import WebSocketClient  # noqa: F401
 
 
 class GDBHelper:
     def __init__(self, toolchain_prefix, websocket_client, elf_file, port, baud_rate):
-        # type: (str, WebSocketClient, str, int, int) -> None
+        # type: (str, Optional[WebSocketClient], str, int, int) -> None
         self._gdb_buffer = b''  # type: bytes
         self._gdb_exit = False  # type: bool
         self.toolchain_prefix = toolchain_prefix

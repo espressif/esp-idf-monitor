@@ -28,8 +28,9 @@ import sys
 from collections import namedtuple
 
 # Used for type annotations only. Silence linter warnings.
-from pyparsing import (Combine, Group, Literal, OneOrMore, ParserElement,  # noqa: F401 # pylint: disable=unused-import
-                       ParseResults, Word, nums, srange)
+from pyparsing import Combine  # noqa: F401 # pylint: disable=unused-import
+from pyparsing import (Group, Literal, OneOrMore, ParserElement, ParseResults,
+                       Word, nums, srange)
 
 try:
     import typing  # noqa: F401 # pylint: disable=unused-import

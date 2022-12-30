@@ -2,7 +2,7 @@
 # SPDX-License-Identifier: Apache-2.0
 
 import threading
-from typing import Optional
+from typing import Optional  # noqa: F401
 
 
 class StoppableThread(object):

@@ -919,7 +919,7 @@ D (96114) vfs: esp_vfs_select returns 1[0m
 D (96114) vfs: FDs in readfds =[0m
 D (96115) vfs: 57[0m
 D (96125) mdf_http_handle: [mdf_http_server_request, 317]:conn->sockfd: 57, conn->http_size: 0[0m
-D (96127) mdf_http_handle: [mdf_http_server_request, 347]:http request, sockfd: 57, conn->http_size: 185, data: 
+D (96127) mdf_http_handle: [mdf_http_server_request, 347]:http request, sockfd: 57, conn->http_size: 185, data:
 GET /mesh_info HTTP/1.1
 token: 1234567890
 Connection: close
@@ -928,7 +928,7 @@ Host: 192.168.1.179
 Accept-Encoding: gzip
 
 [0m
-D (96163) mdf_http_server_parser: [mdf_get_device_mac, 189]:http response, size: 85, data: 
+D (96163) mdf_http_server_parser: [mdf_get_device_mac, 189]:http response, size: 85, data:
 HTTP/1.1 200 OK
 Mesh-Node-Num: 1
 Mesh-Node-Mac: 30aea4004384
@@ -979,7 +979,7 @@ D (97051) vfs: esp_vfs_select returns 1[0m
 D (97052) vfs: FDs in readfds =[0m
 D (97052) vfs: 58[0m
 D (97063) mdf_http_handle: [mdf_http_server_request, 317]:conn->sockfd: 58, conn->http_size: 0[0m
-D (97065) mdf_http_handle: [mdf_http_server_request, 347]:http request, sockfd: 58, conn->http_size: 319, data: 
+D (97065) mdf_http_handle: [mdf_http_server_request, 347]:http request, sockfd: 58, conn->http_size: 319, data:
 POST /device_request HTTP/1.1
 Mesh-Node-Num: 1
 Mesh-Node-Mac: 30aea4004384
@@ -998,7 +998,7 @@ D (97119) light_bulb: [light_bulb_get_value, 110]:cid: 2, value: 0[0m
 D (97130) light_bulb: [light_bulb_get_value, 110]:cid: 3, value: 100[0m
 D (97141) light_bulb: [light_bulb_get_value, 110]:cid: 4, value: 0[0m
 D (97142) light_bulb: [light_bulb_get_value, 110]:cid: 5, value: 30[0m
-D (97155) mdf_http_handle: [mdf_http_server_response, 482]:http response, sockfd: 58, size: 458, data: 
+D (97155) mdf_http_handle: [mdf_http_server_response, 482]:http response, sockfd: 58, size: 458, data:
 HTTP/1.1 200 OK
 Content-Type: application/json
 Mesh-Node-Mac: 30aea4004384
@@ -1157,7 +1157,7 @@ D (103272) vfs: esp_vfs_select returns 1[0m
 D (103272) vfs: FDs in readfds =[0m
 D (103283) vfs: 59[0m
 D (103283) mdf_http_handle: [mdf_http_server_request, 317]:conn->sockfd: 59, conn->http_size: 0[0m
-D (103285) mdf_http_handle: [mdf_http_server_request, 347]:http request, sockfd: 59, conn->http_size: 185, data: 
+D (103285) mdf_http_handle: [mdf_http_server_request, 347]:http request, sockfd: 59, conn->http_size: 185, data:
 GET /mesh_info HTTP/1.1
 token: 1234567890
 Connection: close
@@ -1166,7 +1166,7 @@ Host: 192.168.1.179
 Accept-Encoding: gzip
 
 [0m
-D (103321) mdf_http_server_parser: [mdf_get_device_mac, 189]:http response, size: 85, data: 
+D (103321) mdf_http_server_parser: [mdf_get_device_mac, 189]:http response, size: 85, data:
 HTTP/1.1 200 OK
 Mesh-Node-Num: 1
 Mesh-Node-Mac: 30aea4004384
@@ -1286,7 +1286,7 @@ D (106754) vfs: esp_vfs_select returns 1[0m
 D (106765) vfs: FDs in readfds =[0m
 D (106766) vfs: 60[0m
 D (106766) mdf_http_handle: [mdf_http_server_request, 317]:conn->sockfd: 60, conn->http_size: 0[0m
-D (106778) mdf_http_handle: [mdf_http_server_request, 347]:http request, sockfd: 60, conn->http_size: 319, data: 
+D (106778) mdf_http_handle: [mdf_http_server_request, 347]:http request, sockfd: 60, conn->http_size: 319, data:
 POST /device_request HTTP/1.1
 Mesh-Node-Num: 1
 Mesh-Node-Mac: 30aea4004384
@@ -1329,4 +1329,3 @@ Accept-Encoding: gzip
 [0;32mI (245495) mdf_device_handle: [mdf_show_sysinfo_timercb, 73]:parent: 20:a6:80:98:dc:b4, mac:30:ae:a4:00:43:84, layer: 1, free heap: 60212, compile time: May 26 2018 00:22:11[0m
 [0;32mI (250495) mdf_device_handle: [mdf_show_sysinfo_timercb, 73]:parent: 20:a6:80:98:dc:b4, mac:30:ae:a4:00:43:84, layer: 1, free heap: 60212, compile time: May 26 2018 00:22:11[0m
 [0;32mI (255495) mdf_device_handle: [mdf_show_sysinfo_timercb, 73]:parent: 20:a6:80:98:dc:b4, mac:30:ae:a4:00:43:84, layer: 1, free heap: 60212, compile time: May 26 2018 00:22:11[0m
-

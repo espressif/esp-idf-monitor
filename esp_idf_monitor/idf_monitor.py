@@ -29,7 +29,7 @@ import subprocess
 import sys
 import threading
 import time
-from typing import Any, List, Optional, Type, Union
+from typing import Any, List, Optional, Type, Union  # noqa: F401
 
 import serial
 import serial.tools.list_ports
@@ -58,7 +58,7 @@ from .idf_monitor_base.logger import Logger
 from .idf_monitor_base.output_helpers import normal_print, yellow_print
 from .idf_monitor_base.serial_handler import (SerialHandler,
                                               SerialHandlerNoElf, run_make)
-from .idf_monitor_base.serial_reader import LinuxReader, SerialReader
+from .idf_monitor_base.serial_reader import LinuxReader, Reader, SerialReader
 from .idf_monitor_base.web_socket_client import WebSocketClient
 
 key_description = miniterm.key_description
@@ -97,7 +97,7 @@ class Monitor:
         self.cmd_queue = queue.Queue()  # type: queue.Queue
         self.console = miniterm.Console()
         # if the variable is set ANSI will be printed even if we do not print to terminal
-        sys.stderr = get_converter(sys.stderr, decode_output=True, force_color=force_color)
+        sys.stderr = get_converter(sys.stderr, decode_output=True, force_color=force_color)  # type: ignore
         self.console.output = get_converter(self.console.output, force_color=force_color)
         self.console.byte_output = get_converter(self.console.byte_output, force_color=force_color)
 
@@ -117,7 +117,7 @@ class Monitor:
         if isinstance(self, SerialMonitor):
             socket_mode = serial_instance.port.startswith('socket://')
             self.serial = serial_instance
-            self.serial_reader = SerialReader(self.serial, self.event_queue, reset)
+            self.serial_reader = SerialReader(self.serial, self.event_queue, reset)  # type: Reader
 
             self.gdb_helper = GDBHelper(toolchain_prefix, websocket_client, self.elf_file, self.serial.port,
                                         self.serial.baudrate) if self.elf_exists else None
@@ -211,7 +211,7 @@ class Monitor:
         elif event_tag == TAG_KEY:
             self.serial_write(codecs.encode(data))
         elif event_tag == TAG_SERIAL:
-            self.serial_handler.handle_serial_input(data, self.console_parser, self.coredump,
+            self.serial_handler.handle_serial_input(data, self.console_parser, self.coredump,  # type: ignore
                                                     self.gdb_helper, self._line_matcher,
                                                     self.check_gdb_stub_and_run)
             if self._invoke_processing_last_line_timer is not None:
@@ -228,7 +228,7 @@ class Monitor:
             # the espcoredump loader uses empty line as a sign for end-of-coredump
             # line is finalized only for non coredump data
         elif event_tag == TAG_SERIAL_FLUSH:
-            self.serial_handler.handle_serial_input(data, self.console_parser, self.coredump,
+            self.serial_handler.handle_serial_input(data, self.console_parser, self.coredump,  # type: ignore
                                                     self.gdb_helper, self._line_matcher,
                                                     self.check_gdb_stub_and_run,
                                                     finalize_line=not self.coredump or not self.coredump.in_progress)
@@ -241,13 +241,13 @@ class SerialMonitor(Monitor):
         """ Use 'with self' to temporarily disable monitoring behaviour """
         self.console_reader.start()
         if self.elf_exists:
-            self.serial_reader.gdb_exit = self.gdb_helper.gdb_exit  # write gdb_exit flag
+            self.serial_reader.gdb_exit = self.gdb_helper.gdb_exit  # type: ignore # write gdb_exit flag
         self.serial_reader.start()
 
     def _pre_start(self) -> None:
         super()._pre_start()
         if self.elf_exists:
-            self.gdb_helper.gdb_exit = False
+            self.gdb_helper.gdb_exit = False  # type: ignore
         self.serial_handler.start_cmd_sent = False
 
     def serial_write(self, *args: str, **kwargs: str) -> None:
@@ -265,8 +265,8 @@ class SerialMonitor(Monitor):
                 self.gdb_helper.run_gdb()
 
     def _main_loop(self) -> None:
-        if self.elf_exists and self.gdb_helper.gdb_exit:
-            self.gdb_helper.gdb_exit = False
+        if self.elf_exists and self.gdb_helper.gdb_exit:  # type: ignore
+            self.gdb_helper.gdb_exit = False  # type: ignore
             time.sleep(GDB_EXIT_TIMEOUT)
             # Continue the program after exit from the GDB
             self.serial_write(codecs.encode(GDB_UART_CONTINUE_COMMAND))

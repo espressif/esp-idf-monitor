@@ -1,12 +1,13 @@
 # SPDX-FileCopyrightText: 2015-2021 Espressif Systems (Shanghai) CO LTD
 # SPDX-License-Identifier: Apache-2.0
 
-import queue
+import queue  # noqa: F401
 import textwrap
-from typing import Optional
+from typing import Any, Optional  # noqa: F401
+
+from serial.tools import miniterm
 
 from esp_idf_monitor import __version__
-from serial.tools import miniterm
 
 from .constants import (CMD_APP_FLASH, CMD_ENTER_BOOT, CMD_MAKE,
                         CMD_OUTPUT_TOGGLE, CMD_RESET, CMD_STOP,
@@ -67,7 +68,7 @@ class ConsoleParser(object):
         return ret
 
     def _handle_menu_key(self, c):  # type: (str) -> Optional[tuple]
-        ret = None
+        ret = None  # type: Optional[tuple[int, Any[str, int]]]
         if c == self.exit_key or c == self.menu_key:  # send verbatim
             ret = (TAG_KEY, c)
         elif c in [CTRL_H, 'h', 'H', '?']:
