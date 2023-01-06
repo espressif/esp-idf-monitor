@@ -15,7 +15,7 @@
 # The approach is inspired by Cesanta's ESP8266 GDB server:
 # https://github.com/cesanta/mongoose-os/blob/27777c8977/platforms/esp8266/tools/serve_core.py
 #
-# SPDX-FileCopyrightText: 2020-2022 Espressif Systems (Shanghai) CO LTD
+# SPDX-FileCopyrightText: 2020-2023 Espressif Systems (Shanghai) CO LTD
 # SPDX-License-Identifier: Apache-2.0
 #
 

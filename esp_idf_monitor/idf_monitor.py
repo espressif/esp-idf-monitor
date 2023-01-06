@@ -9,7 +9,7 @@
 # - If core dump output is detected, it is converted to a human-readable report
 #   by espcoredump.py.
 #
-# SPDX-FileCopyrightText: 2015-2022 Espressif Systems (Shanghai) CO LTD
+# SPDX-FileCopyrightText: 2015-2023 Espressif Systems (Shanghai) CO LTD
 # SPDX-License-Identifier: Apache-2.0
 #
 # Contains elements taken from miniterm "Very simple serial terminal" which
