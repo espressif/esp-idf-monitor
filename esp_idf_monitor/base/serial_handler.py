@@ -76,6 +76,21 @@ class SerialHandler:
         self.reset = reset
         self.elf_file = elf_file
 
+    def splitdata(self, data):  # type: (bytes) -> List[bytes]
+        """
+        Split data into lines, while keeping newlines, and move unfinished line for future processing
+        """
+        # if data is empty fallback to empty string for easier concatenation with last line
+        sp = data.splitlines(keepends=True) or [b'']
+        if self._last_line_part != b'':
+            # add unprocessed part from previous "data" to the first line
+            sp[0] = self._last_line_part + sp[0]
+            self._last_line_part = b''
+        if not sp[-1].endswith(b'\n'):
+            # last part is not a full line
+            self._last_line_part = sp.pop()
+        return sp
+
     def handle_serial_input(self, data, console_parser, coredump, gdb_helper, line_matcher,
                             check_gdb_stub_and_run, finalize_line=False):
         #  type: (bytes, ConsoleParser, CoreDump, Optional[GDBHelper], LineMatcher, Callable, bool) -> None
@@ -86,27 +101,19 @@ class SerialHandler:
             if pos != -1:
                 data = data[(pos + 1):]
 
-        sp = data.split(b'\n')
-        if self._last_line_part != b'':
-            # add unprocessed part from previous "data" to the first line
-            sp[0] = self._last_line_part + sp[0]
-            self._last_line_part = b''
-        if sp[-1] != b'':
-            # last part is not a full line
-            self._last_line_part = sp.pop()
+        sp = self.splitdata(data)
         for line in sp:
-            if line == b'':
-                continue
-            if self._serial_check_exit and line == console_parser.exit_key.encode('latin-1'):
+            line_strip = line.strip()
+            if self._serial_check_exit and line_strip == console_parser.exit_key.encode('latin-1'):
                 raise SerialStopException()
             if gdb_helper:
-                self.check_panic_decode_trigger(line, gdb_helper)
-            with coredump.check(line):
-                if self._force_line_print or line_matcher.match(line.decode(errors='ignore')):
-                    self.logger.print(line + b'\n')
+                self.check_panic_decode_trigger(line_strip, gdb_helper)
+            with coredump.check(line_strip):
+                if self._force_line_print or line_matcher.match(line_strip.decode(errors='ignore')):
+                    self.logger.print(line)
                     self.compare_elf_sha256(line.decode(errors='ignore'))
-                    self.logger.handle_possible_pc_address_in_line(line)
-            check_gdb_stub_and_run(line)
+                    self.logger.handle_possible_pc_address_in_line(line_strip)
+            check_gdb_stub_and_run(line_strip)
             self._force_line_print = False
         # Now we have the last part (incomplete line) in _last_line_part. By
         # default we don't touch it and just wait for the arrival of the rest
@@ -239,21 +246,12 @@ class SerialHandlerNoElf(SerialHandler):
             if pos != -1:
                 data = data[(pos + 1):]
 
-        sp = data.split(b'\n')
-        if self._last_line_part != b'':
-            # add unprocessed part from previous "data" to the first line
-            sp[0] = self._last_line_part + sp[0]
-            self._last_line_part = b''
-        if sp[-1] != b'':
-            # last part is not a full line
-            self._last_line_part = sp.pop()
+        sp = self.splitdata(data)
         for line in sp:
-            if line == b'':
-                continue
-            if self._serial_check_exit and line == console_parser.exit_key.encode('latin-1'):
+            if self._serial_check_exit and line.strip() == console_parser.exit_key.encode('latin-1'):
                 raise SerialStopException()
 
-            self.logger.print(line + b'\n')
+            self.logger.print(line)
             self.compare_elf_sha256(line.decode(errors='ignore'))
             self._force_line_print = False
 

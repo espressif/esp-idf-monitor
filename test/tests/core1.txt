@@ -1,4 +1,3 @@
-
 I (195) boot: Loaded app from partition at offset 0x10000
 I (195) boot: Disabling RNG early entropy source...
 I (196) cpu_start: Pro cpu up.
@@ -31,11 +30,8 @@ A6      : 0x00000001  A7      : 0x00060023  A8      : 0x00000001  A9      : 0x00
 A10     : 0x7fffffff  A11     : 0x8001f880  A12     : 0x06ff1ff8  A13     : 0x00000000
 A14     : 0x3ffb7d80  A15     : 0x00000000  SAR     : 0x00000014  EXCCAUSE: 0x0000001d
 EXCVADDR: 0x00000001  LBEG    : 0x00000000  LEND    : 0x00000000  LCOUNT  : 0x00000000
-
 ELF file SHA256: 83cfeb53c9c00c61c4e52674e43654e4b452b7592075920977e491e06a4488d8
-
 Backtrace: 0x400e37f4:0x3ffb5db0 0x400d0c2e:0x3ffb5dd0 0x40087015:0x3ffb5df0
-
 I (401) esp_core_dump_uart: Press Enter to print core dump to UART...
 Core Dump detected!
 I (434) esp_core_dump_uart: Print core dump to uart...
@@ -331,7 +327,6 @@ Fj6ctQ==
 I (1859) esp_core_dump_uart: Core dump has been written to uart.
 Rebooting...
 ets Jun  8 2016 00:22:57
-
 rst:0xc (SW_CPU_RESET),boot:0x1e (SPI_FAST_FLASH_BOOT)
 configsip: 0, SPIWP:0xee
 clk_drv:0x00,q_drv:0x00,d_drv:0x00,cs0_drv:0x00,hd_drv:0x00,wp_drv:0x00
