@@ -7,7 +7,7 @@ import queue  # noqa: F401
 import re
 import subprocess
 import time
-from typing import Callable, Optional  # noqa: F401
+from typing import Callable, List, Optional  # noqa: F401
 
 import serial  # noqa: F401
 from serial.tools import miniterm  # noqa: F401
@@ -263,3 +263,4 @@ class SerialHandlerNoElf(SerialHandler):
         if self._last_line_part != b'' and force_print_or_matched:
             self._force_line_print = True
             self.logger.print(self._last_line_part)
+            self._last_line_part = b''
