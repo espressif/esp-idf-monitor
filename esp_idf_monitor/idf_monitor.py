@@ -100,7 +100,7 @@ class Monitor:
         self.cmd_queue = queue.Queue()  # type: queue.Queue
         self.console = miniterm.Console()
         # if the variable is set ANSI will be printed even if we do not print to terminal
-        sys.stderr = get_converter(sys.stderr, decode_output=True, force_color=force_color)  # type: ignore
+        sys.stderr = get_converter(sys.stderr, force_color=force_color)  # type: ignore
         self.console.output = get_converter(self.console.output, force_color=force_color)
         self.console.byte_output = get_converter(self.console.byte_output, force_color=force_color)
 
