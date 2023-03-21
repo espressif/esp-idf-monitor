@@ -36,7 +36,7 @@ import serial.tools.list_ports
 from serial.tools import miniterm
 
 # Windows console stuff
-from esp_idf_monitor.base.ansi_color_converter import get_converter
+from esp_idf_monitor.base.ansi_color_converter import get_ansi_converter
 from esp_idf_monitor.base.argument_parser import get_parser
 from esp_idf_monitor.base.console_parser import ConsoleParser
 from esp_idf_monitor.base.console_reader import ConsoleReader
@@ -100,9 +100,9 @@ class Monitor:
         self.cmd_queue = queue.Queue()  # type: queue.Queue
         self.console = miniterm.Console()
         # if the variable is set ANSI will be printed even if we do not print to terminal
-        sys.stderr = get_converter(sys.stderr, force_color=force_color)  # type: ignore
-        self.console.output = get_converter(self.console.output, force_color=force_color)
-        self.console.byte_output = get_converter(self.console.byte_output, force_color=force_color)
+        sys.stderr = get_ansi_converter(sys.stderr, force_color=force_color)  # type: ignore
+        self.console.output = get_ansi_converter(self.console.output, force_color=force_color)
+        self.console.byte_output = get_ansi_converter(self.console.byte_output, force_color=force_color)
 
         self.elf_file = elf_file or ''
         self.elf_exists = os.path.exists(self.elf_file)
