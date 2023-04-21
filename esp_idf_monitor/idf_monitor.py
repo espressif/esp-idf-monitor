@@ -293,6 +293,8 @@ class LinuxMonitor(Monitor):
 
 
 def main() -> None:
+    if not sys.stdin.isatty():
+        sys.exit('error: Monitor requires standard input to be attached to TTY')
     parser = get_parser()
     args = parser.parse_args()
 
