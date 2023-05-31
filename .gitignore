@@ -3,3 +3,5 @@ test/outputs
 
 esp_idf_monitor.egg-info
 .eggs
+
+__pycache__
