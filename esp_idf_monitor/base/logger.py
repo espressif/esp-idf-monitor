@@ -15,18 +15,22 @@ from .pc_address_matcher import PcAddressMatcher
 
 class Logger:
     def __init__(self, elf_file, console, timestamps, timestamp_format, pc_address_buffer, enable_address_decoding,
-                 toolchain_prefix):
-        # type: (str, miniterm.Console, bool, str, bytes, bool, str) -> None
+                 toolchain_prefix, rom_elf_file=None):
+        # type: (str, miniterm.Console, bool, str, bytes, bool, str, Optional[str]) -> None
         self.log_file = None  # type: Optional[BinaryIO]
         self._output_enabled = True  # type: bool
         self.elf_file = elf_file
+        self.rom_elf_file = rom_elf_file
         self.console = console
         self.timestamps = timestamps
         self.timestamp_format = timestamp_format
         self._pc_address_buffer = pc_address_buffer
         self.enable_address_decoding = enable_address_decoding
         self.toolchain_prefix = toolchain_prefix
-        self.pc_address_matcher = PcAddressMatcher(self.elf_file) if enable_address_decoding else None
+        if enable_address_decoding:
+            self.pc_address_matcher = PcAddressMatcher(self.elf_file)
+            if rom_elf_file is not None:
+                self.rom_pc_address_matcher = PcAddressMatcher(self.rom_elf_file)  # type: ignore
 
     @property
     def pc_address_buffer(self):  # type: () -> bytes
@@ -121,7 +125,16 @@ class Logger:
             return
         for m in re.finditer(ADDRESS_RE, line.decode(errors='ignore')):
             num = m.group()
-            if self.pc_address_matcher.is_executable_address(int(num, 16)):  # type: ignore
+            address_int = int(num, 16)
+            translation = None
+
+            # Try looking for the address in the app ELF file
+            if self.pc_address_matcher.is_executable_address(address_int):
                 translation = lookup_pc_address(num, self.toolchain_prefix, self.elf_file)
-                if translation:
-                    self.print(translation, console_printer=yellow_print)
+            # Not found in app ELF file, check ROM ELF file (if it is available)
+            if translation is None and self.rom_elf_file is not None and self.rom_pc_address_matcher.is_executable_address(address_int):
+                translation = lookup_pc_address(num, self.toolchain_prefix, self.rom_elf_file, is_rom=True)
+
+            # Translation found either in the app or ROM ELF file
+            if translation is not None:
+                self.print(translation, console_printer=yellow_print)

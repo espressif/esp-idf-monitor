@@ -58,6 +58,7 @@ from esp_idf_monitor.base.gdbhelper import GDBHelper
 from esp_idf_monitor.base.line_matcher import LineMatcher
 from esp_idf_monitor.base.logger import Logger
 from esp_idf_monitor.base.output_helpers import normal_print, yellow_print
+from esp_idf_monitor.base.rom_elf_getter import get_rom_elf_path
 from esp_idf_monitor.base.serial_handler import (SerialHandler,
                                                  SerialHandlerNoElf, run_make)
 from esp_idf_monitor.base.serial_reader import (LinuxReader, Reader,
@@ -94,7 +95,8 @@ class Monitor:
         enable_address_decoding=True,  # type: bool
         timestamps=False,  # type: bool
         timestamp_format='',  # type: str
-        force_color=False  # type: bool
+        force_color=False,  # type: bool
+        rom_elf_file=None,  # type: Optional[str]
     ):
         self.event_queue = queue.Queue()  # type: queue.Queue
         self.cmd_queue = queue.Queue()  # type: queue.Queue
@@ -107,7 +109,7 @@ class Monitor:
         self.elf_file = elf_file or ''
         self.elf_exists = os.path.exists(self.elf_file)
         self.logger = Logger(self.elf_file, self.console, timestamps, timestamp_format, b'', enable_address_decoding,
-                             toolchain_prefix)
+                             toolchain_prefix, rom_elf_file=rom_elf_file)
 
         self.coredump = CoreDump(decode_coredumps, self.event_queue, self.logger, websocket_client,
                                  self.elf_file) if self.elf_exists else None
@@ -319,6 +321,12 @@ def main() -> None:
     else:
         elf_file = args.elf_file
 
+    if isinstance(args.rom_elf_file, io.BufferedReader):
+        rom_elf_file = args.rom_elf_file.name
+        args.rom_elf_file.close()  # don't need this as a file
+    else:
+        rom_elf_file = args.rom_elf_file if args.rom_elf_file is not None else get_rom_elf_path(args.target, args.revision)
+
     # remove the parallel jobserver arguments from MAKEFLAGS, as any
     # parent make is only running 1 job (monitor), so we can re-spawn
     # all of the child makes we need (the -j argument remains part of
@@ -368,7 +376,8 @@ def main() -> None:
                       not args.disable_address_decoding,
                       args.timestamps,
                       args.timestamp_format,
-                      args.force_color)
+                      args.force_color,
+                      rom_elf_file)
 
         yellow_print('--- Quit: {} | Menu: {} | Help: {} followed by {} ---'.format(
             key_description(monitor.console_parser.exit_key),

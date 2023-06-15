@@ -66,6 +66,13 @@ def get_parser():  # type: () -> argparse.ArgumentParser
     )
 
     parser.add_argument(
+        '--rom-elf-file',
+        help='ELF file of target ROM for address decoding. '
+        'If not specified, autodetection is attempted based on the IDF_PATH and ESP_ROM_ELF_DIR env vars.',
+        type=lambda f: open(f, 'rb') if os.path.exists(f) else f'{f}',
+    )
+
+    parser.add_argument(
         '--print_filter',
         help='Filtering string',
         default=DEFAULT_PRINT_FILTER)
