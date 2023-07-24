@@ -248,6 +248,7 @@ class SerialMonitor(Monitor):
         if self.elf_exists:
             self.serial_reader.gdb_exit = self.gdb_helper.gdb_exit  # type: ignore # write gdb_exit flag
         self.serial_reader.start()
+        self.timeout_cnt = 0
 
     def _pre_start(self) -> None:
         super()._pre_start()
@@ -259,6 +260,13 @@ class SerialMonitor(Monitor):
         self.serial: serial.Serial
         try:
             self.serial.write(*args, **kwargs)
+            self.timeout_cnt = 0
+        except serial.SerialTimeoutException:
+            self.timeout_cnt += 1
+            if self.timeout_cnt >= 3:
+                yellow_print('Writing to serial is timing out. Please make sure that your application supports '
+                             'an interactive console and that you have picked the correct console for serial communication.')
+                self.timeout_cnt = 0
         except serial.SerialException:
             pass  # this shouldn't happen, but sometimes port has closed in serial thread
         except UnicodeEncodeError:
@@ -349,6 +357,7 @@ def main() -> None:
             serial_instance = serial.serial_for_url(port, args.baud, do_not_open=True)
             serial_instance.dtr = False
             serial_instance.rts = False
+            serial_instance.write_timeout = 0.3
 
             # Pass the actual used port to callee of idf_monitor (e.g. idf.py/cmake) through `ESPPORT` environment
             # variable.
