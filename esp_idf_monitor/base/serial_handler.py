@@ -76,6 +76,7 @@ class SerialHandler:
         self.encrypted = encrypted
         self.reset = reset
         self.elf_file = elf_file
+        self.decode_error_cnt = 0
 
     def splitdata(self, data):  # type: (bytes) -> List[bytes]
         """
@@ -110,9 +111,18 @@ class SerialHandler:
             if gdb_helper:
                 self.check_panic_decode_trigger(line_strip, gdb_helper)
             with coredump.check(line_strip):
-                if self._force_line_print or line_matcher.match(line_strip.decode(errors='ignore')):
+                try:
+                    decoded_line = line.decode()
+                    self.decode_error_cnt = 0
+                except UnicodeDecodeError:
+                    decoded_line = line_strip.decode(errors='ignore')
+                    self.decode_error_cnt += 1
+                    if self.decode_error_cnt >= 3:
+                        yellow_print('Multiple decode errors occured: Try checking the baud rate and XTAL frequency setting in menuconfig')
+                        self.decode_error_cnt = 0
+                if self._force_line_print or line_matcher.match(decoded_line):
                     self.logger.print(line)
-                    self.compare_elf_sha256(line.decode(errors='ignore'))
+                    self.compare_elf_sha256(decoded_line)
                     self.logger.handle_possible_pc_address_in_line(line_strip)
             check_gdb_stub_and_run(line_strip)
             self._force_line_print = False
