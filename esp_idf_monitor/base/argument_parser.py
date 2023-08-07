@@ -25,6 +25,12 @@ def get_parser():  # type: () -> argparse.ArgumentParser
     )
 
     parser.add_argument(
+        '--ignore-input',
+        help='Do not send console input to the serial port',
+        action='store_true'
+    )
+
+    parser.add_argument(
         '--disable-address-decoding', '-d',
         help="Don't print lines about decoded addresses from the application ELF file",
         action='store_true',

@@ -86,6 +86,7 @@ class Monitor:
         make='make',  # type: str
         encrypted=False,  # type: bool
         reset=True,  # type: bool
+        ignore_input=False,  # type: bool
         toolchain_prefix=DEFAULT_TOOLCHAIN_PREFIX,  # type: str
         eol='CRLF',  # type: str
         decode_coredumps=COREDUMP_DECODE_INFO,  # type: str
@@ -105,6 +106,7 @@ class Monitor:
         sys.stderr = get_ansi_converter(sys.stderr, force_color=force_color)  # type: ignore
         self.console.output = get_ansi_converter(self.console.output, force_color=force_color)
         self.console.byte_output = get_ansi_converter(self.console.byte_output, force_color=force_color)
+        self.ignore_input = ignore_input
 
         self.elf_file = elf_file or ''
         self.elf_exists = os.path.exists(self.elf_file)
@@ -214,7 +216,8 @@ class Monitor:
             self.serial_handler.handle_commands(data, self.target, self.run_make, self.console_reader,
                                                 self.serial_reader)
         elif event_tag == TAG_KEY:
-            self.serial_write(codecs.encode(data))
+            if not self.ignore_input:
+                self.serial_write(codecs.encode(data))
         elif event_tag == TAG_SERIAL:
             self.serial_handler.handle_serial_input(data, self.console_parser, self.coredump,  # type: ignore
                                                     self.gdb_helper, self._line_matcher,
@@ -367,6 +370,7 @@ def main() -> None:
                       args.make,
                       args.encrypted,
                       not args.no_reset,
+                      args.ignore_input,
                       args.toolchain_prefix,
                       args.eol,
                       args.decode_coredumps,
