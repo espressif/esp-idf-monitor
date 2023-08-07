@@ -19,6 +19,7 @@ class Logger:
         # type: (str, miniterm.Console, bool, str, bytes, bool, str, Optional[str]) -> None
         self.log_file = None  # type: Optional[BinaryIO]
         self._output_enabled = True  # type: bool
+        self._start_of_line = True  # type: bool
         self.elf_file = elf_file
         self.rom_elf_file = rom_elf_file
         self.console = console
@@ -91,16 +92,37 @@ class Logger:
         if console_printer is None:
             console_printer = self.console.write_bytes
 
-        if self.timestamps and (self._output_enabled or self._log_file):
+        if isinstance(string, type(u'')):
+            new_line_char = '\n'
+        else:
+            new_line_char = b'\n'  # type: ignore
+
+        if string and self.timestamps and (self._output_enabled or self._log_file):
             t = datetime.datetime.now().strftime(self.timestamp_format)
+
             # "string" is not guaranteed to be a full line. Timestamps should be only at the beginning of lines.
             if isinstance(string, type(u'')):
-                search_patt = '\n'
-                replacement = '\n' + t + ' '
+                line_prefix = t + ' '
             else:
-                search_patt = b'\n'  # type: ignore
-                replacement = b'\n' + t.encode('ascii') + b' '  # type: ignore
-            string = string.replace(search_patt, replacement)  # type: ignore
+                line_prefix = t.encode('ascii') + b' '  # type: ignore
+
+            # If the output is at the start of a new line, prefix it with the timestamp text.
+            if self._start_of_line:
+                string = line_prefix + string  # type: ignore
+
+            # If the new output ends with a newline, remove it so that we don't add a trailing timestamp.
+            self._start_of_line = string.endswith(new_line_char)  # type: ignore
+            if self._start_of_line:
+                string = string[:-len(new_line_char)]
+
+            string = string.replace(new_line_char, new_line_char + line_prefix)  # type: ignore
+
+            # If we're at the start of a new line again, restore the final newline.
+            if self._start_of_line:
+                string += new_line_char  # type: ignore
+        elif string:
+            self._start_of_line = string.endswith(new_line_char)  # type: ignore
+
         if self._output_enabled:
             console_printer(string)
         if self._log_file:
