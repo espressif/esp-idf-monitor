@@ -32,8 +32,7 @@ import time
 from typing import Any, List, Optional, Type, Union  # noqa: F401
 
 import serial
-import serial.tools.list_ports
-from serial.tools import miniterm
+from serial.tools import list_ports, miniterm
 
 # Windows console stuff
 from esp_idf_monitor.base.ansi_color_converter import get_ansi_converter
@@ -312,6 +311,21 @@ def main() -> None:
     # avoid the modification of args.port.
     port = args.port
 
+    # if no port was set, detect connected ports and use one of them
+    if port is None:
+        try:
+            port_list = list_ports.comports()
+            port = port_list[-1].device
+            # keep the `/dev/ttyUSB0` default port on linux if connected
+            # TODO: This can be removed in next major release
+            if sys.platform == 'linux':
+                for p in port_list:
+                    if p.device == '/dev/ttyUSB0':
+                        port = p.device
+                        break
+            yellow_print(f'--- Using autodetected port {port}')
+        except IndexError:
+            sys.exit('No serial ports detected.')
     # GDB uses CreateFile to open COM port, which requires the COM name to be r'\\.\COMx' if the COM
     # number is larger than 10
     if os.name == 'nt' and port.startswith('COM'):

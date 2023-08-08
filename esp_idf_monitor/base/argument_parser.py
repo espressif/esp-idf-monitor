@@ -3,6 +3,7 @@
 
 import argparse
 import os
+import sys
 
 from .constants import (DEFAULT_PRINT_FILTER, DEFAULT_TOOLCHAIN_PREFIX,
                         PANIC_DECODE_BACKTRACE, PANIC_DECODE_DISABLE)
@@ -14,8 +15,9 @@ def get_parser():  # type: () -> argparse.ArgumentParser
 
     parser.add_argument(
         '--port', '-p',
-        help='Serial port device',
-        default=os.environ.get('ESPTOOL_PORT', '/dev/ttyUSB0')
+        help='Serial port device. If not set, a connected port will be used.' +
+        (' Defaults to `/dev/ttyUSB0` if connected.' if sys.platform == 'linux' else ''),
+        default=os.environ.get('ESPTOOL_PORT', None)
     )
 
     parser.add_argument(
