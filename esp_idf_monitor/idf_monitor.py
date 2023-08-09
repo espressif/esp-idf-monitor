@@ -116,6 +116,7 @@ class Monitor:
         # allow for possibility the "make" arg is a list of arguments (for idf.py)
         self.make = make if os.path.exists(make) else shlex.split(make)  # type: Any[Union[str, List[str]], str]
         self.target = target
+        self.timeout_cnt = 0
 
         # testing hook - data from serial can make exit the monitor
         if isinstance(self, SerialMonitor):
@@ -247,7 +248,6 @@ class SerialMonitor(Monitor):
         if self.elf_exists:
             self.serial_reader.gdb_exit = self.gdb_helper.gdb_exit  # type: ignore # write gdb_exit flag
         self.serial_reader.start()
-        self.timeout_cnt = 0
 
     def _pre_start(self) -> None:
         super()._pre_start()
