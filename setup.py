@@ -39,6 +39,7 @@ setup(
         'pyserial>=3.3',
         'esp-coredump~=1.2',
         'pyelftools',
+        'esp-idf-panic-decoder',
     ],
     extras_require={
         'dev': [

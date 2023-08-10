@@ -115,7 +115,7 @@ class GDBHelper:
             cmd = [self.toolchain_prefix + 'gdb',
                    '--batch', '-n',
                    self.elf_file,
-                   '-ex', "target remote | \"{python}\" \"{script}\" --target {target} \"{output_file}\""
+                   '-ex', "target remote | \"{python}\" -m \"{script}\" --target {target} \"{output_file}\""
                        .format(python=sys.executable,
                                script=PANIC_OUTPUT_DECODE_SCRIPT,
                                target=target,

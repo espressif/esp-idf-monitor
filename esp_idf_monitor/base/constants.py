@@ -1,7 +1,6 @@
 # SPDX-FileCopyrightText: 2015-2023 Espressif Systems (Shanghai) CO LTD
 # SPDX-License-Identifier: Apache-2.0
 
-import os
 import re
 
 # Control-key characters
@@ -39,7 +38,7 @@ TAG_SERIAL_FLUSH = 2
 TAG_CMD = 3
 
 # paths to scripts
-PANIC_OUTPUT_DECODE_SCRIPT = os.path.join(os.path.dirname(__file__), '..', 'gdb_panic_server.py')
+PANIC_OUTPUT_DECODE_SCRIPT = 'esp_idf_panic_decoder'
 
 # regex matches an potential address
 ADDRESS_RE = re.compile(r'0x[0-9a-f]{8}', re.IGNORECASE)
