@@ -1,5 +1,6 @@
 # See https://pre-commit.com for more information
 # See https://pre-commit.com/hooks.html for more hooks
+default_install_hook_types: [pre-commit, commit-msg]
 exclude: test/tests
 repos:
   - repo: https://github.com/pre-commit/pre-commit-hooks
@@ -28,3 +29,9 @@ repos:
     rev: 'v0.942'
     hooks:
     -   id: mypy
+
+  - repo: https://github.com/espressif/conventional-precommit-linter
+    rev: v1.2.1
+    hooks:
+      - id: conventional-precommit-linter
+        stages: [commit-msg]
