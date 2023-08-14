@@ -4,7 +4,7 @@
 import datetime
 import os
 import re
-from typing import BinaryIO, Callable, Optional, Union  # noqa: F401
+from typing import AnyStr, BinaryIO, Callable, Optional  # noqa: F401
 
 from serial.tools import miniterm  # noqa: F401
 
@@ -87,8 +87,8 @@ class Logger:
             finally:
                 self._log_file = None
 
-    def print(self, string, console_printer=None):  # noqa: E999
-        # type: (Union[str, bytes], Optional[Callable]) -> None
+    def print(self, string, console_printer=None):
+        # type: (AnyStr, Optional[Callable]) -> None
         if console_printer is None:
             console_printer = self.console.write_bytes
 
@@ -108,20 +108,20 @@ class Logger:
 
             # If the output is at the start of a new line, prefix it with the timestamp text.
             if self._start_of_line:
-                string = line_prefix + string  # type: ignore
+                string = line_prefix + string
 
             # If the new output ends with a newline, remove it so that we don't add a trailing timestamp.
-            self._start_of_line = string.endswith(new_line_char)  # type: ignore
+            self._start_of_line = string.endswith(new_line_char)
             if self._start_of_line:
                 string = string[:-len(new_line_char)]
 
-            string = string.replace(new_line_char, new_line_char + line_prefix)  # type: ignore
+            string = string.replace(new_line_char, new_line_char + line_prefix)
 
             # If we're at the start of a new line again, restore the final newline.
             if self._start_of_line:
-                string += new_line_char  # type: ignore
+                string += new_line_char
         elif string:
-            self._start_of_line = string.endswith(new_line_char)  # type: ignore
+            self._start_of_line = string.endswith(new_line_char)
 
         if self._output_enabled:
             console_printer(string)
