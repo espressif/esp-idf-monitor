@@ -80,7 +80,7 @@ class SerialReader(Reader):
                     # the disappearance of the device
                     red_print(e.strerror)
                     yellow_print('Waiting for the device to reconnect', newline='')
-                    self.serial.close()
+                    self.close_serial()
                     while self.alive:  # so that exiting monitor works while waiting
                         try:
                             time.sleep(RECONNECT_DELAY)
@@ -97,7 +97,35 @@ class SerialReader(Reader):
                 if data:
                     self.event_queue.put((TAG_SERIAL, data), False)
         finally:
-            self.serial.close()
+            self.close_serial()
+
+    def close_serial(self):
+        if sys.platform == 'linux':
+            # Avoid waiting for 30 seconds before closing the serial connection
+            self.set_closing_wait(delay_sec=1)
+        self.serial.close()
+
+    def set_closing_wait(self, delay_sec):  # type: (int) -> None
+        import fcntl
+        import struct
+        import termios
+
+        # `serial_struct` format based on linux kernel source:
+        # https://github.com/torvalds/linux/blob/25aa0bebba72b318e71fe205bfd1236550cc9534/include/uapi/linux/serial.h#L19
+        struct_format = 'iiIiiiiiHcciHHPHIL'
+        buf = bytes(struct.calcsize(struct_format))
+
+        # get serial_struct
+        fcntl.ioctl(self.serial.fd, termios.TIOCGSERIAL, buf)
+        serial_struct = list(struct.unpack(struct_format, buf))
+
+        # set `closing_wait` - amount of time, in hundredths of a second, that the kernel should wait before closing port
+        # `closing_wait` is 13th (indexing from 0) variable in `serial_struct`, for reference see struct_format var
+        serial_struct[12] = delay_sec * 100
+
+        # set serial_struct
+        buf = struct.pack(struct_format, *serial_struct)
+        fcntl.ioctl(self.serial.fd, termios.TIOCSSERIAL, buf)
 
     def _cancel(self):
         #  type: () -> None
