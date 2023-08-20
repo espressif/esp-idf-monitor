@@ -261,11 +261,11 @@ class SerialMonitor(Monitor):
             self.serial.write(*args, **kwargs)
             self.timeout_cnt = 0
         except serial.SerialTimeoutException:
-            self.timeout_cnt += 1
-            if self.timeout_cnt >= 3:
+            if not self.timeout_cnt:
                 yellow_print('Writing to serial is timing out. Please make sure that your application supports '
                              'an interactive console and that you have picked the correct console for serial communication.')
-                self.timeout_cnt = 0
+            self.timeout_cnt += 1
+            self.timeout_cnt %= 3
         except serial.SerialException:
             pass  # this shouldn't happen, but sometimes port has closed in serial thread
         except UnicodeEncodeError:
