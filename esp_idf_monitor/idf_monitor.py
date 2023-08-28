@@ -371,7 +371,9 @@ def main() -> None:
             serial_instance = serial.serial_for_url(port, args.baud, do_not_open=True)
             serial_instance.dtr = False
             serial_instance.rts = False
-            serial_instance.write_timeout = 0.3
+            # setting write timeout is not supported for RFC2217 in pyserial
+            if not port.startswith('rfc2217://'):
+                serial_instance.write_timeout = 0.3
 
             # Pass the actual used port to callee of idf_monitor (e.g. idf.py/cmake) through `ESPPORT` environment
             # variable.
