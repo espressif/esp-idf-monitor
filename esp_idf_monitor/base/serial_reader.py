@@ -9,8 +9,8 @@ import time
 import serial
 from serial.tools import list_ports
 
-from .constants import (CHECK_ALIVE_FLAG_TIMEOUT, MINIMAL_EN_LOW_DELAY,
-                        RECONNECT_DELAY, TAG_SERIAL)
+from .constants import (ASYNC_CLOSING_WAIT_NONE, CHECK_ALIVE_FLAG_TIMEOUT,
+                        MINIMAL_EN_LOW_DELAY, RECONNECT_DELAY, TAG_SERIAL)
 from .output_helpers import red_print, yellow_print
 from .stoppable_thread import StoppableThread
 
@@ -121,8 +121,6 @@ class SerialReader(Reader):
 
         # set `closing_wait` - amount of time, in hundredths of a second, that the kernel should wait before closing port
         # `closing_wait` is 13th (indexing from 0) variable in `serial_struct`, for reference see struct_format var
-        ASYNC_CLOSING_WAIT_NONE = 65535  # "don't wait at all"
-
         if serial_struct[12] == ASYNC_CLOSING_WAIT_NONE:
             return
 
