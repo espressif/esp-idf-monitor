@@ -1,6 +1,6 @@
 name: DangerJS Check
 on:
-  pull_request:
+  pull_request_target:
     types: [opened, edited, reopened, synchronize]
 
 permissions:
@@ -11,7 +11,10 @@ jobs:
   pull-request-style-linter:
     runs-on: ubuntu-latest
     steps:
-    - uses: actions/checkout@v3
+    - name: Check out PR head
+      uses: actions/checkout@v3
+      with:
+        ref: ${{ github.event.pull_request.head.sha }}
 
     - name: DangerJS pull request linter
       uses: espressif/github-actions/danger_pr_review@master

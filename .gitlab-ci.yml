@@ -1,12 +1,14 @@
-include:
-  - project: 'espressif/shared-ci-dangerjs'
-    ref: master
-    file: 'danger.yaml'
-
 stages:
-  - danger
+  - pre-check
   - codecheck
   - test
+
+include:
+  - project: espressif/shared-ci-dangerjs
+    ref: master
+    file: danger.yaml
+run-danger-mr-linter:
+  stage: pre-check
 
 # WORKFLOW RULES
 # ------------------------------------------------------------------------------------------------------
