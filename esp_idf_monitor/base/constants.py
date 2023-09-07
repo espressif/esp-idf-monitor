@@ -75,3 +75,6 @@ LAST_LINE_THREAD_INTERVAL = 0.1
 MINIMAL_EN_LOW_DELAY = 0.005
 RECONNECT_DELAY = 0.5  # timeout between reconnect tries
 CHECK_ALIVE_FLAG_TIMEOUT = 0.25  # timeout for checking alive flags (currently used by serial reader)
+
+# closing wait timeout for serial port
+ASYNC_CLOSING_WAIT_NONE = 0xFFFF  # don't wait at all
