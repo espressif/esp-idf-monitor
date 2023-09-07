@@ -64,6 +64,8 @@ from esp_idf_monitor.base.serial_reader import (LinuxReader, Reader,
                                                 SerialReader)
 from esp_idf_monitor.base.web_socket_client import WebSocketClient
 
+from . import __version__
+
 key_description = miniterm.key_description
 
 
@@ -366,7 +368,7 @@ def main() -> None:
         if args.target == 'linux':
             serial_instance = None
             cls = LinuxMonitor
-            yellow_print('--- idf_monitor on linux ---')
+            yellow_print('--- esp-idf-monitor {} on linux ---'.format(__version__))
         else:
             serial_instance = serial.serial_for_url(port, args.baud, do_not_open=True)
             serial_instance.dtr = False
@@ -384,7 +386,7 @@ def main() -> None:
             os.environ.update({ESPPORT_ENVIRON: espport_val})
 
             cls = SerialMonitor
-            yellow_print('--- idf_monitor on {p.name} {p.baudrate} ---'.format(p=serial_instance))
+            yellow_print('--- esp-idf-monitor {v} on {p.name} {p.baudrate} ---'.format(v=__version__, p=serial_instance))
 
         monitor = cls(serial_instance,
                       elf_file,
