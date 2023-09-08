@@ -8,6 +8,8 @@ from typing import AnyStr, BinaryIO, Callable, Optional  # noqa: F401
 
 from serial.tools import miniterm  # noqa: F401
 
+from esp_idf_monitor.base.key_config import MENU_KEY, TOGGLE_OUTPUT_KEY
+
 from .constants import ADDRESS_RE
 from .output_helpers import lookup_pc_address, red_print, yellow_print
 from .pc_address_matcher import PcAddressMatcher
@@ -137,8 +139,8 @@ class Logger:
 
     def output_toggle(self):  # type: () -> None
         self.output_enabled = not self.output_enabled
-        yellow_print('\nToggle output display: {}, Type Ctrl-T Ctrl-Y to show/disable output again.'.format(
-            self.output_enabled))
+        yellow_print(f'\nToggle output display: {self.output_enabled}, '
+                     f'Type {MENU_KEY} {TOGGLE_OUTPUT_KEY} to show/disable output again.')
 
     def handle_possible_pc_address_in_line(self, line):  # type: (bytes) -> None
         line = self._pc_address_buffer + line

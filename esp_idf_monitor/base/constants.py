@@ -4,19 +4,8 @@
 import re
 
 # Control-key characters
-CTRL_A = '\x01'
-CTRL_B = '\x02'
 CTRL_C = '\x03'
-CTRL_F = '\x06'
 CTRL_H = '\x08'
-CTRL_I = '\x09'
-CTRL_R = '\x12'
-CTRL_T = '\x14'
-CTRL_Y = '\x19'
-CTRL_P = '\x10'
-CTRL_X = '\x18'
-CTRL_L = '\x0c'
-CTRL_RBRACKET = '\x1d'  # Ctrl+]
 
 # VT100 escape sequences
 CONSOLE_STATUS_QUERY = b'\x1b[5n'

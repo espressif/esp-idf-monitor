@@ -1,4 +1,4 @@
-# SPDX-FileCopyrightText: 2015-2021 Espressif Systems (Shanghai) CO LTD
+# SPDX-FileCopyrightText: 2015-2023 Espressif Systems (Shanghai) CO LTD
 # SPDX-License-Identifier: Apache-2.0
 
 import queue  # noqa: F401
@@ -11,10 +11,13 @@ from esp_idf_monitor import __version__
 
 from .constants import (CMD_APP_FLASH, CMD_ENTER_BOOT, CMD_MAKE,
                         CMD_OUTPUT_TOGGLE, CMD_RESET, CMD_STOP,
-                        CMD_TOGGLE_LOGGING, CMD_TOGGLE_TIMESTAMPS, CTRL_A,
-                        CTRL_F, CTRL_H, CTRL_I, CTRL_L, CTRL_P, CTRL_R,
-                        CTRL_RBRACKET, CTRL_T, CTRL_X, CTRL_Y, TAG_CMD,
-                        TAG_KEY)
+                        CMD_TOGGLE_LOGGING, CMD_TOGGLE_TIMESTAMPS, CTRL_H,
+                        TAG_CMD, TAG_KEY)
+from .key_config import (CHIP_RESET_BOOTLOADER_KEY, CHIP_RESET_KEY,
+                         COMMAND_KEYS, EXIT_KEY, EXIT_MENU_KEY, MENU_KEY,
+                         RECOMPILE_UPLOAD_APP_KEY, RECOMPILE_UPLOAD_KEY,
+                         SKIP_MENU_KEY, TOGGLE_LOG_KEY, TOGGLE_OUTPUT_KEY,
+                         TOGGLE_TIMESTAMPS_KEY)
 from .output_helpers import red_print
 
 key_description = miniterm.key_description
@@ -24,11 +27,11 @@ def prompt_next_action(reason, console, console_parser, event_queue, cmd_queue):
     # type: (str, miniterm.Console, ConsoleParser, queue.Queue, queue.Queue) -> None
     console.setup()  # set up console to trap input characters
     try:
-        red_print('--- {}'.format(reason))
+        red_print(f'--- {reason}')
         red_print(console_parser.get_next_action_text())
 
-        k = CTRL_T  # ignore CTRL-T here, so people can muscle-memory Ctrl-T Ctrl-F, etc.
-        while k == CTRL_T:
+        k = MENU_KEY  # ignore CTRL-T here, so people can muscle-memory Ctrl-T Ctrl-F, etc.
+        while k == MENU_KEY:
             k = console.getkey()
     finally:
         console.cleanup()
@@ -50,17 +53,16 @@ class ConsoleParser(object):
             'CR': lambda c: c.replace('\n', '\r'),
             'LF': lambda c: c.replace('\r', '\n'),
         }[eol]
-        self.menu_key = CTRL_T
-        self.exit_key = CTRL_RBRACKET
         self._pressed_menu_key = False
 
     def parse(self, key):  # type: (str) -> Optional[tuple]
         ret = None
-        if self._pressed_menu_key:
+        # check for command_keys, so the monitor will not complain about not know key, when used with skip menu option
+        if self._pressed_menu_key or (SKIP_MENU_KEY and key in COMMAND_KEYS):
             ret = self._handle_menu_key(key)
-        elif key == self.menu_key:
+        elif key == MENU_KEY:
             self._pressed_menu_key = True
-        elif key == self.exit_key:
+        elif key == EXIT_KEY:
             ret = (TAG_CMD, CMD_STOP)
         else:
             key = self.translate_eol(key)
@@ -69,84 +71,77 @@ class ConsoleParser(object):
 
     def _handle_menu_key(self, c):  # type: (str) -> Optional[tuple]
         ret = None  # type: Optional[tuple[int, Any[str, int]]]
-        if c == self.exit_key or c == self.menu_key:  # send verbatim
+        if c in [EXIT_KEY, MENU_KEY]:  # send verbatim
             ret = (TAG_KEY, c)
         elif c in [CTRL_H, 'h', 'H', '?']:
             red_print(self.get_help_text())
-        elif c == CTRL_R:  # Reset device via RTS
+        elif c == CHIP_RESET_KEY:  # Reset device via RTS
             ret = (TAG_CMD, CMD_RESET)
-        elif c == CTRL_F:  # Recompile & upload
+        elif c == RECOMPILE_UPLOAD_KEY:  # Recompile & upload
             ret = (TAG_CMD, CMD_MAKE)
-        elif c in [CTRL_A, 'a', 'A']:  # Recompile & upload app only
+        elif c in [RECOMPILE_UPLOAD_APP_KEY, 'a', 'A']:  # Recompile & upload app only
             # "CTRL-A" cannot be captured with the default settings of the Windows command line, therefore, "A" can be used
             # instead
             ret = (TAG_CMD, CMD_APP_FLASH)
-        elif c == CTRL_Y:  # Toggle output display
+        elif c == TOGGLE_OUTPUT_KEY:  # Toggle output display
             ret = (TAG_CMD, CMD_OUTPUT_TOGGLE)
-        elif c == CTRL_L:  # Toggle saving output into file
+        elif c == TOGGLE_LOG_KEY:  # Toggle saving output into file
             ret = (TAG_CMD, CMD_TOGGLE_LOGGING)
-        elif c in [CTRL_I, 'i', 'I']:  # Toggle printing timestamps
+        elif c in [TOGGLE_TIMESTAMPS_KEY, 'i', 'I']:  # Toggle printing timestamps
             ret = (TAG_CMD, CMD_TOGGLE_TIMESTAMPS)
-        elif c == CTRL_P:
+        elif c == CHIP_RESET_BOOTLOADER_KEY:
             # to fast trigger pause without press menu key
             ret = (TAG_CMD, CMD_ENTER_BOOT)
-        elif c in [CTRL_X, 'x', 'X']:  # Exiting from within the menu
+        elif c in [EXIT_MENU_KEY, 'x', 'X']:  # Exiting from within the menu
             ret = (TAG_CMD, CMD_STOP)
         else:
-            red_print('--- unknown menu character {} --'.format(key_description(c)))
+            red_print(f'--- unknown menu character {key_description(c)} --')
 
         self._pressed_menu_key = False
         return ret
 
     def get_help_text(self):  # type: () -> str
-        text = """\
-            --- idf_monitor ({version}) - ESP-IDF monitor tool
+        text = f"""\
+            --- esp_idf_monitor ({__version__}) - ESP-IDF Monitor tool
             --- based on miniterm from pySerial
             ---
-            --- {exit:8} Exit program
-            --- {menu:8} Menu escape key, followed by:
+            --- {key_description(EXIT_KEY):8} Exit program
+            --- {key_description(MENU_KEY):8} Menu escape key, followed by:
             --- Menu keys:
-            ---    {menu:14} Send the menu character itself to remote
-            ---    {exit:14} Send the exit character itself to remote
-            ---    {reset:14} Reset target board via RTS line
-            ---    {makecmd:14} Build & flash project
-            ---    {appmake:14} Build & flash app only
-            ---    {output:14} Toggle output display
-            ---    {log:14} Toggle saving output into file
-            ---    {timestamps:14} Toggle printing timestamps
-            ---    {pause:14} Reset target into bootloader to pause app via RTS line
-            ---    {menuexit:14} Exit program
-        """.format(version=__version__,
-                   exit=key_description(self.exit_key),
-                   menu=key_description(self.menu_key),
-                   reset=key_description(CTRL_R),
-                   makecmd=key_description(CTRL_F),
-                   appmake=key_description(CTRL_A) + ' (or A)',
-                   output=key_description(CTRL_Y),
-                   log=key_description(CTRL_L),
-                   timestamps=key_description(CTRL_I) + ' (or I)',
-                   pause=key_description(CTRL_P),
-                   menuexit=key_description(CTRL_X) + ' (or X)')
+            ---    {key_description(MENU_KEY):14} Send the menu character itself to remote
+            ---    {key_description(EXIT_KEY):14} Send the exit character itself to remote
+            ---    {key_description(CHIP_RESET_KEY):14} Reset target board via RTS line
+            ---    {key_description(RECOMPILE_UPLOAD_KEY):14} Build & flash project
+            ---    {key_description(RECOMPILE_UPLOAD_APP_KEY) + ' (or A)':14} Build & flash app only
+            ---    {key_description(TOGGLE_OUTPUT_KEY):14} Toggle output display
+            ---    {key_description(TOGGLE_LOG_KEY):14} Toggle saving output into file
+            ---    {key_description(TOGGLE_TIMESTAMPS_KEY) + ' (or I)':14} Toggle printing timestamps
+            ---    {key_description(CHIP_RESET_BOOTLOADER_KEY):14} Reset target into bootloader via the DTR/RTS lines
+            ---    {key_description(EXIT_MENU_KEY) + ' (or X)':14} Exit program"""
+
+        if SKIP_MENU_KEY:
+            text += """
+            ---
+            --- Using the "skip_menu_key" option from a config file. Commands can be executed without pressing the menu escape key.
+            """
         return textwrap.dedent(text)
 
     def get_next_action_text(self):  # type: () -> str
-        text = """\
-            --- Press {} to exit monitor.
-            --- Press {} to build & flash project.
-            --- Press {} to build & flash app.
+        text = f"""\
+            --- Press {key_description(EXIT_KEY)} to exit monitor.
+            --- Press {key_description(RECOMPILE_UPLOAD_KEY)} to build & flash project.
+            --- Press {key_description(RECOMPILE_UPLOAD_APP_KEY)} to build & flash app.
             --- Press any other key to resume monitor (resets target).
-        """.format(key_description(self.exit_key),
-                   key_description(CTRL_F),
-                   key_description(CTRL_A))
+        """
         return textwrap.dedent(text)
 
     def parse_next_action_key(self, c):  # type: (str) -> Optional[tuple]
         ret = None
-        if c == self.exit_key:
+        if c == EXIT_KEY:
             ret = (TAG_CMD, CMD_STOP)
-        elif c == CTRL_F:  # Recompile & upload
+        elif c == RECOMPILE_UPLOAD_KEY:  # Recompile & upload
             ret = (TAG_CMD, CMD_MAKE)
-        elif c in [CTRL_A, 'a', 'A']:  # Recompile & upload app only
+        elif c in [RECOMPILE_UPLOAD_APP_KEY, 'a', 'A']:  # Recompile & upload app only
             # "CTRL-A" cannot be captured with the default settings of the Windows command line, therefore, "A" can be used
             # instead
             ret = (TAG_CMD, CMD_APP_FLASH)
