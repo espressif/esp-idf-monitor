@@ -132,7 +132,7 @@ class SerialReader(Reader):
         buf = struct.pack(struct_format, *serial_struct)
         try:
             fcntl.ioctl(self.serial.fd, termios.TIOCSSERIAL, buf)
-        except PermissionError:
+        except OSError:
             # Discard written but not yet transmitted data
             termios.tcflush(self.serial.fd, termios.TCOFLUSH)
 
