@@ -4,6 +4,7 @@
 
 import os
 import queue  # noqa: F401
+import sys
 import time
 
 from serial.tools.miniterm import Console  # noqa: F401
@@ -26,6 +27,14 @@ class ConsoleReader(StoppableThread):
         self.cmd_queue = cmd_queue
         self.parser = parser
         self.test_mode = test_mode
+        if sys.platform == 'win32':
+            # This is a workaround for multi-byte characters causing the console to be killed by OS.
+            # Miniterm is setting the code page to UTF-8 which in combination with multibyte Unicode characters
+            # results in Critical Error in Windows: https://github.com/espressif/esp-idf/issues/12162
+            # Note: UTF-8 characters seem to work even without this setting
+            import ctypes
+            ctypes.windll.kernel32.SetConsoleOutputCP(console._saved_ocp)
+            ctypes.windll.kernel32.SetConsoleCP(console._saved_icp)
 
     def run(self):
         # type: () -> None
