@@ -48,6 +48,14 @@ setup(
         'ide': [
             'websocket-client'
         ],
+        'test': [
+            'SimpleWebSocketServer',
+            'pytest_embedded',
+            'pytest_embedded_idf',
+            'pytest_embedded_serial_esp',
+            'idf_build_apps~=1.0.1',
+            'idf-component-manager',
+        ]
     },
     keywords=['espressif', 'embedded', 'monitor', 'serial'],
     classifiers=[

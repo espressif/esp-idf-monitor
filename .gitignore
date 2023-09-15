@@ -1,5 +1,10 @@
 # IDF monitor test
 test/outputs
+test/test_apps/*/build
+test/test_apps/**/build_*_*/
+test/test_apps/**/sdkconfig
+test/test_apps/**/sdkconfig.old
+test/test_apps/pytest_embedded_log/
 
 esp_idf_monitor.egg-info
 .eggs
