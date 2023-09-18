@@ -90,13 +90,15 @@ def test_iteration(runner, test):
                            '--port', 'socket://{}:{}?logging=debug'.format(HOST, runner.port),
                            '--serial_alive_file', SERIAL_ALIVE_FILE,
                            '--print_filter', test[1]]
+            monitor_env = os.environ.copy()
+            monitor_env['ESP_IDF_MONITOR_TEST'] = '1'  # will be used in idf_monitor.py to detect socket test mode
             (master_fd, slave_fd) = pty.openpty()
             print('\t', ' '.join(monitor_cmd), sep='')
             print('\tstdout="{}" stderr="{}" stdin="{}"'.format(o_f.name, e_f.name, os.ttyname(slave_fd)))
             print('\tMonitor timeout: {} seconds'.format(test[3]))
             start = time.time()
             # the server socket is alive so idf_monitor can start now
-            proc = subprocess.Popen(monitor_cmd, stdin=slave_fd, stdout=o_f, stderr=e_f, close_fds=True, bufsize=0)
+            proc = subprocess.Popen(monitor_cmd, stdin=slave_fd, stdout=o_f, stderr=e_f, close_fds=True, bufsize=0, env=monitor_env)
             # - idf_monitor's stdin needs to be connected to some pseudo-tty in docker image even when it is not
             #   used at all
             # - setting bufsize is needed because the default value is different on Python 2 and 3
