@@ -100,39 +100,41 @@ class SerialReader(Reader):
             self.close_serial()
 
     def close_serial(self):
-        if sys.platform == 'linux':
-            # Avoid waiting for 30 seconds before closing the serial connection
-            self._disable_closing_wait_or_discard_data()
+        # Avoid waiting for 30 seconds before closing the serial connection
+        self._disable_closing_wait_or_discard_data()
         self.serial.close()
 
     def _disable_closing_wait_or_discard_data(self):  # type: () -> None
-        import fcntl
-        import struct
-        import termios
+        if sys.platform == 'linux':
+            import fcntl
+            import struct
+            import termios
 
-        # `serial_struct` format based on linux kernel source:
-        # https://github.com/torvalds/linux/blob/25aa0bebba72b318e71fe205bfd1236550cc9534/include/uapi/linux/serial.h#L19
-        struct_format = 'iiIiiiiiHcciHHPHIL'
-        buf = bytes(struct.calcsize(struct_format))
+            # `serial_struct` format based on linux kernel source:
+            # https://github.com/torvalds/linux/blob/25aa0bebba72b318e71fe205bfd1236550cc9534/include/uapi/linux/serial.h#L19
+            struct_format = 'iiIiiiiiHcciHHPHIL'
+            buf = bytes(struct.calcsize(struct_format))
 
-        # get serial_struct
-        buf = fcntl.ioctl(self.serial.fd, termios.TIOCGSERIAL, buf)
-        serial_struct = list(struct.unpack(struct_format, buf))
+            # get serial_struct
+            buf = fcntl.ioctl(self.serial.fd, termios.TIOCGSERIAL, buf)
+            serial_struct = list(struct.unpack(struct_format, buf))
 
-        # set `closing_wait` - amount of time, in hundredths of a second, that the kernel should wait before closing port
-        # `closing_wait` is 13th (indexing from 0) variable in `serial_struct`, for reference see struct_format var
-        if serial_struct[12] == ASYNC_CLOSING_WAIT_NONE:
-            return
+            # set `closing_wait` - amount of time, in hundredths of a second, that the kernel should wait before closing port
+            # `closing_wait` is 13th (indexing from 0) variable in `serial_struct`, for reference see struct_format var
+            if serial_struct[12] == ASYNC_CLOSING_WAIT_NONE:
+                return
 
-        serial_struct[12] = ASYNC_CLOSING_WAIT_NONE
+            serial_struct[12] = ASYNC_CLOSING_WAIT_NONE
 
-        # set serial_struct
-        buf = struct.pack(struct_format, *serial_struct)
-        try:
-            fcntl.ioctl(self.serial.fd, termios.TIOCSSERIAL, buf)
-        except OSError:
-            # Discard written but not yet transmitted data
-            termios.tcflush(self.serial.fd, termios.TCOFLUSH)
+            # set serial_struct
+            buf = struct.pack(struct_format, *serial_struct)
+            try:
+                fcntl.ioctl(self.serial.fd, termios.TIOCSSERIAL, buf)
+            except OSError:
+                # Discard written but not yet transmitted data
+                termios.tcflush(self.serial.fd, termios.TCOFLUSH)
+        else:
+            pass
 
     def _cancel(self):
         #  type: () -> None

@@ -39,7 +39,7 @@ class ConsoleReader(StoppableThread):
     def run(self):
         # type: () -> None
         self.console.setup()
-        if os.name == 'posix':
+        if sys.platform != 'win32':
             # Use non-blocking busy read to avoid using unsecure TIOCSTI from console.cancel().
             # TIOCSTI is not supported on kernels newer than 6.2.
             import termios
