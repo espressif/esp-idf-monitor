@@ -115,21 +115,18 @@ class GDBHelper:
             cmd = [self.toolchain_prefix + 'gdb',
                    '--batch', '-n',
                    self.elf_file,
-                   '-ex', "target remote | \"{python}\" -m \"{script}\" --target {target} \"{output_file}\""
-                       .format(python=sys.executable,
-                               script=PANIC_OUTPUT_DECODE_SCRIPT,
-                               target=target,
-                               output_file=panic_output_file.name),
+                   '-ex', f'target remote | "{sys.executable}" -m "{PANIC_OUTPUT_DECODE_SCRIPT}" '
+                   f'--target {target} "{panic_output_file.name}"',
                    '-ex', 'bt']
             output = subprocess.check_output(cmd, stderr=subprocess.STDOUT)
             yellow_print('\nBacktrace:\n\n')
-            logger.print(output)  # noqa: E999
+            logger.print(output)
         except subprocess.CalledProcessError as e:
-            yellow_print('Failed to run gdb_panic_server.py script: {}\n{}\n\n'.format(e, e.output))
-            logger.print(panic_output)
+            red_print(f'Failed to run gdb_panic_server.py script: {e}\n{e.output}\n\n')
+            raise
         finally:
             if panic_output_file is not None:
                 try:
                     os.unlink(panic_output_file.name)
                 except OSError as e:
-                    yellow_print('Couldn\'t remove temporary panic output file ({})'.format(e))
+                    yellow_print(f'Couldn\'t remove temporary panic output file ({e})')

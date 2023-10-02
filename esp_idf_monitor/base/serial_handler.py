@@ -175,7 +175,15 @@ class SerialHandler:
         if self._reading_panic == PANIC_READING and PANIC_END in line:
             self._reading_panic = PANIC_IDLE
             self.logger.output_enabled = True
-            gdb_helper.process_panic_output(self._panic_buffer, self.logger, self.target)
+            try:
+                gdb_helper.process_panic_output(self._panic_buffer, self.logger, self.target)
+            except subprocess.CalledProcessError:
+                # in case of error, print the rest of panic buffer that wasn't logged yet
+                # we stopped logging with PANIC_STACK_DUMP and reenabled logging with PANIC_END
+                l_idx = self._panic_buffer.find(PANIC_STACK_DUMP)
+                r_idx = self._panic_buffer.find(PANIC_END)
+                self.logger.print(self._panic_buffer[l_idx:r_idx])
+
             self._panic_buffer = b''
 
     def compare_elf_sha256(self, line):  # type: (str) -> None
