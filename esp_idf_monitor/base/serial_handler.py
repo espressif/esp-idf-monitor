@@ -13,7 +13,8 @@ import serial  # noqa: F401
 from serial.tools import miniterm  # noqa: F401
 
 from .chip_specific_config import get_chip_config
-from .console_parser import ConsoleParser, prompt_next_action  # noqa: F401
+from .console_parser import (ConsoleParser, key_description,  # noqa: F401
+                             prompt_next_action)
 from .console_reader import ConsoleReader  # noqa: F401
 from .constants import (CMD_APP_FLASH, CMD_ENTER_BOOT, CMD_MAKE,
                         CMD_OUTPUT_TOGGLE, CMD_RESET, CMD_STOP,
@@ -24,6 +25,7 @@ from .constants import (CMD_APP_FLASH, CMD_ENTER_BOOT, CMD_MAKE,
 from .coredump import CoreDump  # noqa: F401
 from .exceptions import SerialStopException
 from .gdbhelper import GDBHelper  # noqa: F401
+from .key_config import CHIP_RESET_KEY, EXIT_KEY, MENU_KEY
 from .line_matcher import LineMatcher  # noqa: F401
 from .logger import Logger  # noqa: F401
 from .output_helpers import yellow_print
@@ -106,7 +108,7 @@ class SerialHandler:
         sp = self.splitdata(data)
         for line in sp:
             line_strip = line.strip()
-            if self._serial_check_exit and line_strip == console_parser.exit_key.encode('latin-1'):
+            if self._serial_check_exit and line_strip == EXIT_KEY.encode('latin-1'):
                 raise SerialStopException()
             if gdb_helper:
                 self.check_panic_decode_trigger(line_strip, gdb_helper)
@@ -243,7 +245,7 @@ class SerialHandler:
         elif cmd == CMD_TOGGLE_TIMESTAMPS:
             self.logger.toggle_timestamps()
         elif cmd == CMD_ENTER_BOOT:
-            yellow_print('Pause app (enter bootloader mode), press Ctrl-T Ctrl-R to restart')
+            yellow_print(f'Pause app (enter bootloader mode), press {key_description(MENU_KEY)} {key_description(CHIP_RESET_KEY)} to restart')
             self.serial_instance.setDTR(high)  # IO0=HIGH
             self.serial_instance.setRTS(low)  # EN=LOW, chip in reset
             self.serial_instance.setDTR(self.serial_instance.dtr)  # usbser.sys workaround
@@ -272,7 +274,7 @@ class SerialHandlerNoElf(SerialHandler):
 
         sp = self.splitdata(data)
         for line in sp:
-            if self._serial_check_exit and line.strip() == console_parser.exit_key.encode('latin-1'):
+            if self._serial_check_exit and line.strip() == EXIT_KEY.encode('latin-1'):
                 raise SerialStopException()
 
             if self._force_line_print or line_matcher.match(line.decode(errors='ignore')):

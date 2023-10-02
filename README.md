@@ -4,6 +4,10 @@ The ```esp-idf-monitor``` is a Python-based, open-source package that is part of
 
 The main responsibility of the IDF Monitor is serial communication input and output in ESP-IDF projects. More information about IDF Monitor can be found in [IDF documentation](https://docs.espressif.com/projects/esp-idf/en/latest/esp32/api-guides/tools/idf-monitor.html).
 
+## Customizable Config
+
+```esp-idf-monitor``` supports customizable menu keystrokes using a config file. For more information about setting up the config and supported options please follow [IDF documentation](https://docs.espressif.com/projects/esp-idf/en/latest/esp32/api-guides/tools/idf-monitor.html#configuration-file).
+
 ## Contributing
 
 ### Code Style & Static Analysis

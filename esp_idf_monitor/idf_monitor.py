@@ -54,6 +54,7 @@ from esp_idf_monitor.base.constants import (CTRL_C, CTRL_H,
 from esp_idf_monitor.base.coredump import COREDUMP_DECODE_INFO, CoreDump
 from esp_idf_monitor.base.exceptions import SerialStopException
 from esp_idf_monitor.base.gdbhelper import GDBHelper
+from esp_idf_monitor.base.key_config import EXIT_KEY, EXIT_MENU_KEY, MENU_KEY
 from esp_idf_monitor.base.line_matcher import LineMatcher
 from esp_idf_monitor.base.logger import Logger
 from esp_idf_monitor.base.output_helpers import normal_print, yellow_print
@@ -63,6 +64,7 @@ from esp_idf_monitor.base.serial_handler import (SerialHandler,
 from esp_idf_monitor.base.serial_reader import (LinuxReader, Reader,
                                                 SerialReader)
 from esp_idf_monitor.base.web_socket_client import WebSocketClient
+from esp_idf_monitor.config import load_configuration
 
 from . import __version__
 
@@ -175,7 +177,10 @@ class Monitor:
                 try:
                     self._main_loop()
                 except KeyboardInterrupt:
-                    yellow_print('To exit from IDF monitor please use \"Ctrl+]\". Alternatively, you can use Ctrl-T Ctrl-X to exit.')
+                    yellow_print(
+                        f'To exit from IDF monitor please use \"{key_description(EXIT_KEY)}\". '
+                        f'Alternatively, you can use {key_description(MENU_KEY)} {key_description(EXIT_MENU_KEY)} to exit.'
+                    )
                     self.serial_write(codecs.encode(CTRL_C))
         except SerialStopException:
             normal_print('Stopping condition has been received\n')
@@ -406,13 +411,13 @@ def main() -> None:
                       args.force_color,
                       rom_elf_file)
 
-        yellow_print('--- Quit: {} | Menu: {} | Help: {} followed by {} ---'.format(
-            key_description(monitor.console_parser.exit_key),
-            key_description(monitor.console_parser.menu_key),
-            key_description(monitor.console_parser.menu_key),
-            key_description(CTRL_H)))
+        yellow_print('--- Quit: {q} | Menu: {m} | Help: {m} followed by {h} ---'.format(
+            q=key_description(EXIT_KEY),
+            m=key_description(MENU_KEY),
+            h=key_description(CTRL_H)))
         if args.print_filter != DEFAULT_PRINT_FILTER:
             yellow_print('--- Print filter: {} ---'.format(args.print_filter))
+        load_configuration(verbose=True)
         monitor.main_loop()
     except KeyboardInterrupt:
         pass
