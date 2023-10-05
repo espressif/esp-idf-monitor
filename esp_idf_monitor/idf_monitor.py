@@ -122,9 +122,9 @@ class Monitor:
         self.target = target
         self.timeout_cnt = 0
 
-        # testing hook - data from serial can make exit the monitor
         if isinstance(self, SerialMonitor):
-            socket_mode = serial_instance.port.startswith('socket://')
+            # testing hook: when running tests, input from console is ignored
+            socket_test_mode = serial_instance.port.startswith('socket://') and os.environ.get('ESP_IDF_MONITOR_TEST') == '1'
             self.serial = serial_instance
             self.serial_reader = SerialReader(self.serial, self.event_queue, reset)  # type: Reader
 
@@ -132,7 +132,7 @@ class Monitor:
                                         self.serial.baudrate) if self.elf_exists else None
 
         else:
-            socket_mode = False
+            socket_test_mode = False
             self.serial = subprocess.Popen([self.elf_file], stdin=subprocess.PIPE, stdout=subprocess.PIPE,
                                            stderr=subprocess.STDOUT)
             self.serial_reader = LinuxReader(self.serial, self.event_queue)
@@ -140,12 +140,12 @@ class Monitor:
             self.gdb_helper = None
 
         cls = SerialHandler if self.elf_exists else SerialHandlerNoElf
-        self.serial_handler = cls(b'', socket_mode, self.logger, decode_panic, PANIC_IDLE, b'', target,
+        self.serial_handler = cls(b'', socket_test_mode, self.logger, decode_panic, PANIC_IDLE, b'', target,
                                   False, False, self.serial, encrypted, reset, self.elf_file)
 
         self.console_parser = ConsoleParser(eol)
         self.console_reader = ConsoleReader(self.console, self.event_queue, self.cmd_queue, self.console_parser,
-                                            socket_mode)
+                                            socket_test_mode)
 
         self._line_matcher = LineMatcher(print_filter)
 
