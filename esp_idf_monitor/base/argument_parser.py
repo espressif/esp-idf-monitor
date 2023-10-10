@@ -77,7 +77,7 @@ def get_parser():  # type: () -> argparse.ArgumentParser
     parser.add_argument(
         '--print_filter',
         help='Filtering string',
-        default=DEFAULT_PRINT_FILTER)
+        default=os.environ.get('ESP_IDF_MONITOR_PRINT_FILTER', DEFAULT_PRINT_FILTER))
 
     parser.add_argument(
         '--decode-coredumps',
