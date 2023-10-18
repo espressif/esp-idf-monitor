@@ -416,7 +416,11 @@ def main() -> None:
             m=key_description(MENU_KEY),
             h=key_description(CTRL_H)))
         if args.print_filter != DEFAULT_PRINT_FILTER:
-            yellow_print('--- Print filter: {} ---'.format(args.print_filter))
+            msg = ''
+            # Check if environment variable was used to set print_filter
+            if args.print_filter == os.environ.get('ESP_IDF_MONITOR_PRINT_FILTER', None):
+                msg = ' (set with ESP_IDF_MONITOR_PRINT_FILTER environment variable)'
+            yellow_print(f'--- Print filter: "{args.print_filter}"{msg} ---')
         load_configuration(verbose=True)
         monitor.main_loop()
     except KeyboardInterrupt:
