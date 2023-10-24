@@ -105,7 +105,8 @@ class SerialReader(Reader):
         self.serial.close()
 
     def _disable_closing_wait_or_discard_data(self):  # type: () -> None
-        if sys.platform == 'linux':
+        # ignore setting closing wait for network ports such as RFC2217
+        if sys.platform == 'linux' and hasattr(self.serial, 'fd'):
             import fcntl
             import struct
             import termios
