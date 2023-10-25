@@ -64,7 +64,7 @@ from esp_idf_monitor.base.serial_handler import (SerialHandler,
 from esp_idf_monitor.base.serial_reader import (LinuxReader, Reader,
                                                 SerialReader)
 from esp_idf_monitor.base.web_socket_client import WebSocketClient
-from esp_idf_monitor.config import load_configuration
+from esp_idf_monitor.config import Config
 
 from . import __version__
 
@@ -421,7 +421,7 @@ def main() -> None:
             if args.print_filter == os.environ.get('ESP_IDF_MONITOR_PRINT_FILTER', None):
                 msg = ' (set with ESP_IDF_MONITOR_PRINT_FILTER environment variable)'
             yellow_print(f'--- Print filter: "{args.print_filter}"{msg} ---')
-        load_configuration(verbose=True)
+        Config().load_configuration(verbose=True)
         monitor.main_loop()
     except KeyboardInterrupt:
         pass
