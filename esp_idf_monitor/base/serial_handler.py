@@ -6,13 +6,11 @@ import os
 import queue  # noqa: F401
 import re
 import subprocess
-import time
 from typing import Callable, List, Optional  # noqa: F401
 
 import serial  # noqa: F401
 from serial.tools import miniterm  # noqa: F401
 
-from .chip_specific_config import get_chip_config
 from .console_parser import (ConsoleParser, key_description,  # noqa: F401
                              prompt_next_action)
 from .console_reader import ConsoleReader  # noqa: F401
@@ -29,6 +27,7 @@ from .key_config import CHIP_RESET_KEY, EXIT_KEY, MENU_KEY
 from .line_matcher import LineMatcher  # noqa: F401
 from .logger import Logger  # noqa: F401
 from .output_helpers import yellow_print
+from .reset import Reset
 from .serial_reader import Reader  # noqa: F401
 
 
@@ -63,8 +62,8 @@ class SerialHandler:
     The class is responsible for buffering serial input and performing corresponding commands.
     """
     def __init__(self, last_line_part, serial_check_exit, logger, decode_panic, reading_panic, panic_buffer, target,
-                 force_line_print, start_cmd_sent, serial_instance, encrypted, reset, elf_file):
-        # type: (bytes, bool, Logger, str, int, bytes,str, bool, bool, serial.Serial, bool, bool, str) -> None
+                 force_line_print, start_cmd_sent, serial_instance, encrypted, elf_file):
+        # type: (bytes, bool, Logger, str, int, bytes,str, bool, bool, serial.Serial, bool, str) -> None
         self._last_line_part = last_line_part
         self._serial_check_exit = serial_check_exit
         self.logger = logger
@@ -76,9 +75,9 @@ class SerialHandler:
         self.start_cmd_sent = start_cmd_sent
         self.serial_instance = serial_instance
         self.encrypted = encrypted
-        self.reset = reset
         self.elf_file = elf_file
         self.decode_error_cnt = 0
+        self.reset = Reset(serial_instance, target)
 
     def splitdata(self, data):  # type: (bytes) -> List[bytes]
         """
@@ -208,13 +207,6 @@ class SerialHandler:
 
     def handle_commands(self, cmd, chip, run_make_func, console_reader, serial_reader):
         # type: (int, str, Callable, ConsoleReader, Reader) -> None
-        config = get_chip_config(chip)
-        reset_delay = config['reset']
-        enter_boot_set = config['enter_boot_set']
-        enter_boot_unset = config['enter_boot_unset']
-
-        high = False
-        low = True
 
         if chip == 'linux':
             if cmd in [CMD_RESET,
@@ -228,11 +220,7 @@ class SerialHandler:
             console_reader.stop()
             serial_reader.stop()
         elif cmd == CMD_RESET:
-            self.serial_instance.setRTS(low)  # EN=LOW, chip in reset
-            self.serial_instance.setDTR(self.serial_instance.dtr)  # usbser.sys workaround
-            time.sleep(reset_delay)
-            self.serial_instance.setRTS(high)  # EN=HIGH, chip out of reset
-            self.serial_instance.setDTR(self.serial_instance.dtr)  # usbser.sys workaround
+            self.reset.hard()
             self.logger.output_enabled = True
         elif cmd == CMD_MAKE:
             run_make_func('encrypted-flash' if self.encrypted else 'flash')
@@ -246,15 +234,7 @@ class SerialHandler:
             self.logger.toggle_timestamps()
         elif cmd == CMD_ENTER_BOOT:
             yellow_print(f'Pause app (enter bootloader mode), press {key_description(MENU_KEY)} {key_description(CHIP_RESET_KEY)} to restart')
-            self.serial_instance.setDTR(high)  # IO0=HIGH
-            self.serial_instance.setRTS(low)  # EN=LOW, chip in reset
-            self.serial_instance.setDTR(self.serial_instance.dtr)  # usbser.sys workaround
-            time.sleep(enter_boot_set)  # timeouts taken from esptool.py, includes esp32r0 workaround. defaults: 0.1
-            self.serial_instance.setDTR(low)  # IO0=LOW
-            self.serial_instance.setRTS(high)  # EN=HIGH, chip out of reset
-            self.serial_instance.setDTR(self.serial_instance.dtr)  # usbser.sys workaround
-            time.sleep(enter_boot_unset)  # timeouts taken from esptool.py, includes esp32r0 workaround. defaults: 0.05
-            self.serial_instance.setDTR(high)  # IO0=HIGH, done
+            self.reset.to_bootloader()
         else:
             raise RuntimeError('Bad command data %d' % cmd)  # type: ignore
 

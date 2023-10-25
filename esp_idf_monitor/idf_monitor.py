@@ -141,7 +141,7 @@ class Monitor:
 
         cls = SerialHandler if self.elf_exists else SerialHandlerNoElf
         self.serial_handler = cls(b'', socket_test_mode, self.logger, decode_panic, PANIC_IDLE, b'', target,
-                                  False, False, self.serial, encrypted, reset, self.elf_file)
+                                  False, False, self.serial, encrypted, self.elf_file)
 
         self.console_parser = ConsoleParser(eol)
         self.console_reader = ConsoleReader(self.console, self.event_queue, self.cmd_queue, self.console_parser,
