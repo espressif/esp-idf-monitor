@@ -1,6 +1,7 @@
 # IDF monitor test
-test/outputs
+test/host_test/outputs
 test/test_apps/*/build
+test/test_apps/**/build_*/
 test/test_apps/**/build_*_*/
 test/test_apps/**/sdkconfig
 test/test_apps/**/sdkconfig.old

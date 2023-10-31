@@ -124,7 +124,7 @@ class Monitor:
 
         if isinstance(self, SerialMonitor):
             # testing hook: when running tests, input from console is ignored
-            socket_test_mode = serial_instance.port.startswith('socket://') and os.environ.get('ESP_IDF_MONITOR_TEST') == '1'
+            socket_test_mode = os.environ.get('ESP_IDF_MONITOR_TEST') == '1'
             self.serial = serial_instance
             self.serial_reader = SerialReader(self.serial, self.event_queue, reset)  # type: Reader
 
