@@ -3,11 +3,11 @@
 
 from typing import Optional
 
-from esp_idf_monitor.config import load_configuration
+from esp_idf_monitor.config import Config
 
 from .output_helpers import red_print
 
-cfg, _ = load_configuration()
+cfg, _ = Config().load_configuration()
 cfg = cfg['esp-idf-monitor']
 
 

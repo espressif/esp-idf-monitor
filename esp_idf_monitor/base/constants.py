@@ -67,3 +67,10 @@ CHECK_ALIVE_FLAG_TIMEOUT = 0.25  # timeout for checking alive flags (currently u
 
 # closing wait timeout for serial port
 ASYNC_CLOSING_WAIT_NONE = 0xFFFF  # don't wait at all
+
+# Device PIDs
+USB_JTAG_SERIAL_PID = 0x1001
+
+# DTR and RTS pin settings
+LOW = True
+HIGH = False
