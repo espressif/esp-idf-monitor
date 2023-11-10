@@ -44,7 +44,7 @@ workflow:
     - build
     - internet
   before_script:
-    - pip install -e .[dev] --prefer-binary
+    - pip install -e .[dev,host_test] --prefer-binary
 
 .build_template:
   stage: build
@@ -68,7 +68,7 @@ workflow:
 #
 .before_script_build_jobs:
   before_script:
-    - pip install .[dev,test] --prefer-binary
+    - pip install .[dev,target_test] --prefer-binary
 
 .build_pytest_template:
   stage: build
@@ -113,14 +113,10 @@ workflow:
 build_idf_latest:
   extends: .build_pytest_template
   image: espressif/idf:latest
-  variables:
-    TEST_TARGETS: "esp32 esp32s2 esp32s3 esp32c2 esp32c3 esp32c6 esp32h2"
 
 build_idf_v5.1:
   extends: .build_pytest_template
   image: espressif/idf:release-v5.1
-  variables:
-    TEST_TARGETS: "esp32 esp32s2 esp32s3 esp32c2 esp32c3"
 # ------------------------------------------------------------------------------------------------------
 
 
@@ -149,14 +145,16 @@ test_idf_monitor:
     # save artifacts always in order to access results which were retried without consequent failure
     when: always
     paths:
-      - test/outputs/*
+      - test/host_test/outputs/*
     expire_in: 1 week
   script:
-    - cd test
-    - ./run_test_idf_monitor.py
+    - cd test/host_test
+    # don't use the configuration file
+    - pytest -c /dev/null test_monitor.py
 
 .before_script_pytest_jobs:
   before_script:
+    - pip install .[target_test] --prefer-binary
     # Get ESP-IDF and install the tools (such as addr2line). We don't need the whole ESP-IDF, but it is easier for downloading required tools.
     # Dowloading just the tools would require recreating the directory structure and downloading dependencies one by one.
     - cd /opt/
