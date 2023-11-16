@@ -11,24 +11,25 @@
 #
 # for more information see the method "handle_commands" in idf_monitor.py
 
+from .constants import MINIMAL_EN_LOW_DELAY
 
 conf = {
     # the default values were previously hardcoded in idf_monitor.py (taken from esptool.py)
     'default': {
         0: {
-            'reset': 0.2,
+            'reset': MINIMAL_EN_LOW_DELAY,
             'enter_boot_set': 0.1,
             'enter_boot_unset': 0.05,
         }
     },
     'esp32': {
         0: {
-            'reset': 0.2,
+            'reset': MINIMAL_EN_LOW_DELAY,
             'enter_boot_set': 1.3,
             'enter_boot_unset': 0.45,
         },
         100: {
-            'reset': 0.2,
+            'reset': MINIMAL_EN_LOW_DELAY,
             'enter_boot_set': 0.1,
             'enter_boot_unset': 0.05,
         }
