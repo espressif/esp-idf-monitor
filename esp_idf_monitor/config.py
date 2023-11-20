@@ -30,7 +30,6 @@ class Config:
     def __init__(self, config_name='esp-idf-monitor', env_path='ESP_IDF_MONITOR_CFGFILE') -> None:
         self.config_name = config_name
         self.env_var_name = env_path
-        self.CONFIG_FILENAMES = list(set([f'{self.config_name}.cfg'] + self.CONFIG_FILENAMES))
 
     def validate_configuration(self, file_path, verbose=False):
         if not os.path.exists(file_path):

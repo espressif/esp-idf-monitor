@@ -40,9 +40,14 @@ class Reset:
         self.serial_instance = serial_instance
         self.chip_config = get_chip_config(chip)
         self.port_pid = self._get_port_pid()
-        custom_cfg = Config('esptool', 'ESPTOOL_CFGFILE')
+        custom_cfg = Config()
         custom_config, self.config_path = custom_cfg.load_configuration()
-        self.custom_seq = custom_config['esptool'].get('custom_reset_sequence', None)
+        # Try to get the custom reset sequence from esp-idf-monitor, fallback to esptool if not defined
+        self.esptool_config = False
+        self.custom_seq = custom_config['esp-idf-monitor'].get('custom_reset_sequence')
+        if self.custom_seq is None and hasattr(custom_config, 'esptool'):
+            self.custom_seq = custom_config['esptool'].get('custom_reset_sequence')
+            self.esptool_config = True
 
     def _get_port_pid(self) -> Optional[int]:
         """Get port PID to differentiate between JTAG and UART reset sequences"""
@@ -98,7 +103,8 @@ class Reset:
         """Reset chip into booloader"""
         if self.custom_seq:
             # use custom reset sequence set in config file
-            yellow_print(f'--- Using custom reset sequence from esptool config file: {self.config_path}')
+            source = 'from esptool ' if self.esptool_config else ''
+            yellow_print(f'--- Using custom reset sequence {source}config file: {self.config_path}')
             exec(self._parse_string_to_seq(self.custom_seq))
         elif self.port_pid == USB_JTAG_SERIAL_PID:
             # use reset sequence for JTAG
