@@ -126,7 +126,7 @@ class Monitor:
             # testing hook: when running tests, input from console is ignored
             socket_test_mode = os.environ.get('ESP_IDF_MONITOR_TEST') == '1'
             self.serial = serial_instance
-            self.serial_reader = SerialReader(self.serial, self.event_queue, reset)  # type: Reader
+            self.serial_reader = SerialReader(self.serial, self.event_queue, reset, target)  # type: Reader
 
             self.gdb_helper = GDBHelper(toolchain_prefix, websocket_client, self.elf_file, self.serial.port,
                                         self.serial.baudrate) if self.elf_exists else None
@@ -376,8 +376,6 @@ def main() -> None:
             yellow_print('--- esp-idf-monitor {} on linux ---'.format(__version__))
         else:
             serial_instance = serial.serial_for_url(port, args.baud, do_not_open=True)
-            serial_instance.dtr = False
-            serial_instance.rts = False
             # setting write timeout is not supported for RFC2217 in pyserial
             if not port.startswith('rfc2217://'):
                 serial_instance.write_timeout = 0.3

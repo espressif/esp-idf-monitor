@@ -10,8 +10,9 @@ import serial
 from serial.tools import list_ports
 
 from .constants import (ASYNC_CLOSING_WAIT_NONE, CHECK_ALIVE_FLAG_TIMEOUT,
-                        MINIMAL_EN_LOW_DELAY, RECONNECT_DELAY, TAG_SERIAL)
+                        HIGH, LOW, RECONNECT_DELAY, TAG_SERIAL)
 from .output_helpers import red_print, yellow_print
+from .reset import Reset
 from .stoppable_thread import StoppableThread
 
 
@@ -24,14 +25,15 @@ class SerialReader(Reader):
     event queue, until stopped.
     """
 
-    def __init__(self, serial_instance, event_queue, reset):
-        #  type: (serial.Serial, queue.Queue, bool) -> None
+    def __init__(self, serial_instance, event_queue, reset, target):
+        #  type: (serial.Serial, queue.Queue, bool, str) -> None
         super(SerialReader, self).__init__()
         self.baud = serial_instance.baudrate
         self.serial = serial_instance
         self.event_queue = event_queue
         self.gdb_exit = False
         self.reset = reset
+        self.reset_strategy = Reset(serial_instance, target)
         if not hasattr(self.serial, 'cancel_read'):
             # enable timeout for checking alive flag,
             # if cancel_read not available
@@ -41,35 +43,16 @@ class SerialReader(Reader):
         #  type: () -> None
         if not self.serial.is_open:
             self.serial.baudrate = self.baud
-            # We can come to this thread at startup or from external application line GDB.
-            # If we come from GDB we would like to continue to run without reset.
-
-            high = False
-            low = True
-
-            self.serial.dtr = low      # Non reset state
-            self.serial.rts = high     # IO0=HIGH
-            self.serial.dtr = self.serial.dtr   # usbser.sys workaround
-            # Current state not reset the target!
             try:
-                self.serial.open()
+                # We can come to this thread at startup or from external application line GDB.
+                # If we come from GDB we would like to continue to run without reset.
+                self.open_serial(reset=not self.gdb_exit and self.reset)
             except serial.serialutil.SerialException:
                 # if connection to port fails suggest other available ports
                 port_list = '\n'.join([p.device for p in list_ports.comports()])
                 yellow_print(f'Connection to {self.serial.portstr} failed. Available ports:\n{port_list}')
                 return
-            if not self.gdb_exit and self.reset:
-                self.serial.dtr = high     # Set dtr to reset state (affected by rts)
-                self.serial.rts = low      # Set rts/dtr to the reset state
-                self.serial.dtr = self.serial.dtr   # usbser.sys workaround
-
-                # Add a delay to meet the requirements of minimal EN low time (2ms for ESP32-C3)
-                time.sleep(MINIMAL_EN_LOW_DELAY)
-            elif not self.reset:
-                self.serial.setDTR(high)  # IO0=HIGH, default state
             self.gdb_exit = False
-            self.serial.rts = high             # Set rts/dtr to the working state
-            self.serial.dtr = self.serial.dtr   # usbser.sys workaround
         try:
             while self.alive:
                 try:
@@ -84,11 +67,7 @@ class SerialReader(Reader):
                     while self.alive:  # so that exiting monitor works while waiting
                         try:
                             time.sleep(RECONNECT_DELAY)
-                            if not self.reset:
-                                self.serial.dtr = low      # Non reset state
-                                self.serial.rts = high     # IO0=HIGH
-                                self.serial.dtr = self.serial.dtr   # usbser.sys workaround
-                            self.serial.open()
+                            self.open_serial(self.reset)
                             break  # device connected
                         except serial.serialutil.SerialException:
                             yellow_print('.', newline='')
@@ -98,6 +77,19 @@ class SerialReader(Reader):
                     self.event_queue.put((TAG_SERIAL, data), False)
         finally:
             self.close_serial()
+
+    def open_serial(self, reset: bool) -> None:
+        # set the DTR/RTS into LOW prior open
+        self.reset_strategy._setRTS(LOW)
+        self.reset_strategy._setDTR(LOW)
+
+        self.serial.open()
+
+        # set DTR/RTS into expected HIGH state, but set the RTS first to avoid reset
+        self.reset_strategy._setRTS(HIGH)
+        self.reset_strategy._setDTR(HIGH)
+        if reset:
+            self.reset_strategy.hard()
 
     def close_serial(self):
         # Avoid waiting for 30 seconds before closing the serial connection
