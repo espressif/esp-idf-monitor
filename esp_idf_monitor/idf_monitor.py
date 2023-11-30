@@ -29,7 +29,7 @@ import subprocess
 import sys
 import threading
 import time
-from typing import Any, List, Optional, Type, Union  # noqa: F401
+from typing import Any, List, NoReturn, Optional, Type, Union  # noqa: F401
 
 import serial
 from serial.tools import list_ports, miniterm
@@ -308,41 +308,29 @@ class LinuxMonitor(Monitor):
         return  # fake function for linux target
 
 
+def detect_port() -> Union[str, NoReturn]:
+    """Detect connected ports and return the last one"""
+    try:
+        port_list = list_ports.comports()
+        port: str = port_list[-1].device
+        # keep the `/dev/ttyUSB0` default port on linux if connected
+        # TODO: This can be removed in next major release
+        if sys.platform == 'linux':
+            for p in port_list:
+                if p.device == '/dev/ttyUSB0':
+                    port = p.device
+                    break
+        yellow_print(f'--- Using autodetected port {port}')
+        return port
+    except IndexError:
+        sys.exit('No serial ports detected.')
+
+
 def main() -> None:
     if not sys.stdin.isatty():
         sys.exit('error: Monitor requires standard input to be attached to TTY')
     parser = get_parser()
     args = parser.parse_args()
-
-    # The port name is changed in cases described in the following lines. Use a local argument and
-    # avoid the modification of args.port.
-    port = args.port
-
-    # if no port was set, detect connected ports and use one of them
-    if port is None:
-        try:
-            port_list = list_ports.comports()
-            port = port_list[-1].device
-            # keep the `/dev/ttyUSB0` default port on linux if connected
-            # TODO: This can be removed in next major release
-            if sys.platform == 'linux':
-                for p in port_list:
-                    if p.device == '/dev/ttyUSB0':
-                        port = p.device
-                        break
-            yellow_print(f'--- Using autodetected port {port}')
-        except IndexError:
-            sys.exit('No serial ports detected.')
-    # GDB uses CreateFile to open COM port, which requires the COM name to be r'\\.\COMx' if the COM
-    # number is larger than 10
-    if os.name == 'nt' and port.startswith('COM'):
-        port = port.replace('COM', r'\\.\COM')
-        yellow_print('--- WARNING: GDB cannot open serial ports accessed as COMx')
-        yellow_print('--- Using %s instead...' % port)
-    elif port.startswith('/dev/tty.') and sys.platform == 'darwin':
-        port = port.replace('/dev/tty.', '/dev/cu.')
-        yellow_print('--- WARNING: Serial ports accessed as /dev/tty.* will hang gdb if launched.')
-        yellow_print('--- Using %s instead...' % port)
 
     if isinstance(args.elf_file, io.BufferedReader):
         elf_file = args.elf_file.name
@@ -375,6 +363,24 @@ def main() -> None:
             cls = LinuxMonitor
             yellow_print('--- esp-idf-monitor {} on linux ---'.format(__version__))
         else:
+            # The port name is changed in cases described in the following lines.
+            # Use a local argument and avoid the modification of args.port.
+            port = args.port
+
+            # if no port was set, detect connected ports and use one of them
+            if port is None:
+                port = detect_port()
+            # GDB uses CreateFile to open COM port, which requires the COM name to be r'\\.\COMx' if the COM
+            # number is larger than 10
+            if os.name == 'nt' and port.startswith('COM'):
+                port = port.replace('COM', r'\\.\COM')
+                yellow_print('--- WARNING: GDB cannot open serial ports accessed as COMx')
+                yellow_print(f'--- Using {port} instead...')
+            elif port.startswith('/dev/tty.') and sys.platform == 'darwin':
+                port = port.replace('/dev/tty.', '/dev/cu.')
+                yellow_print('--- WARNING: Serial ports accessed as /dev/tty.* will hang gdb if launched.')
+                yellow_print(f'--- Using {port} instead...')
+
             serial_instance = serial.serial_for_url(port, args.baud, do_not_open=True)
             # setting write timeout is not supported for RFC2217 in pyserial
             if not port.startswith('rfc2217://'):

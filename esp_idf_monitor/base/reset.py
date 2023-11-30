@@ -46,6 +46,9 @@ class Reset:
 
     def _get_port_pid(self) -> Optional[int]:
         """Get port PID to differentiate between JTAG and UART reset sequences"""
+        if not hasattr(self.serial_instance, 'port'):
+            # Linux target serial does not have a port and thus does not support resseting
+            return None
         for port in list_ports.comports():
             if port.device == self.serial_instance.port:
                 return port.pid  # type: ignore
