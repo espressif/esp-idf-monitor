@@ -98,7 +98,7 @@ class SerialReader(Reader):
 
     def _disable_closing_wait_or_discard_data(self):  # type: () -> None
         # ignore setting closing wait for network ports such as RFC2217
-        if sys.platform == 'linux' and hasattr(self.serial, 'fd'):
+        if sys.platform == 'linux' and hasattr(self.serial, 'fd') and self.serial.is_open:
             import fcntl
             import struct
             import termios
@@ -109,7 +109,11 @@ class SerialReader(Reader):
             buf = bytes(struct.calcsize(struct_format))
 
             # get serial_struct
-            buf = fcntl.ioctl(self.serial.fd, termios.TIOCGSERIAL, buf)
+            try:
+                buf = fcntl.ioctl(self.serial.fd, termios.TIOCGSERIAL, buf)
+            except IOError:
+                # port has been disconnected
+                return
             serial_struct = list(struct.unpack(struct_format, buf))
 
             # set `closing_wait` - amount of time, in hundredths of a second, that the kernel should wait before closing port
