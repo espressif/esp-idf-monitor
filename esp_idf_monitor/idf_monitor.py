@@ -134,7 +134,7 @@ class Monitor:
         else:
             socket_test_mode = False
             self.serial = subprocess.Popen([self.elf_file], stdin=subprocess.PIPE, stdout=subprocess.PIPE,
-                                           stderr=subprocess.STDOUT)
+                                           stderr=subprocess.STDOUT, bufsize=0)
             self.serial_reader = LinuxReader(self.serial, self.event_queue)
 
             self.gdb_helper = None
@@ -331,6 +331,9 @@ def main() -> None:
         sys.exit('error: Monitor requires standard input to be attached to TTY')
     parser = get_parser()
     args = parser.parse_args()
+
+    # use EOL from argument; defaults to LF for Linux targets and CR otherwise
+    args.eol = args.eol or ('LF' if args.target == 'linux' else 'CR')
 
     if isinstance(args.elf_file, io.BufferedReader):
         elf_file = args.elf_file.name

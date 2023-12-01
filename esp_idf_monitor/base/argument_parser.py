@@ -58,8 +58,9 @@ def get_parser():  # type: () -> argparse.ArgumentParser
         '--eol',
         choices=['CR', 'LF', 'CRLF'],
         type=lambda c: c.upper(),
-        help='End of line to use when sending to the serial port',
-        default='CR')
+        help='End of line to use when sending to the serial port. '
+             'Defaults to LF for Linux targets and CR otherwise.',
+        )
 
     parser.add_argument(
         'elf_file', help='ELF file of application',

@@ -153,14 +153,12 @@ class LinuxReader(Reader):
         self.proc = process
         self.event_queue = event_queue
 
-        self._stdout = iter(self.proc.stdout.readline, b'')  # type: ignore
-
     def run(self):  # type: () -> None
         try:
             while self.alive:
-                for line in self._stdout:
-                    if line:
-                        self.event_queue.put((TAG_SERIAL, line), False)
+                c = self.proc.stdout.read(1)  # type: ignore
+                if c:
+                    self.event_queue.put((TAG_SERIAL, c), False)
         finally:
             self.proc.terminate()
 
