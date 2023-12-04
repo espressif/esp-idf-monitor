@@ -295,10 +295,40 @@ class TestConfig(TestBaseClass):
         ]
         assert '\n'.join(my_seq) in log_seq
 
-    def test_esptool_invalid_sequence(self):
+    def test_custom_sequence_precedence(self):
+        """Define custom reset sequence in esptool and esp-idf-monitor sections and make sure that the one from esp-idf-monitor is used"""
+        # create custom config with custom reset sequence
+        filename = self.create_config({'custom_reset_sequence': 'R1|W0.1|R0|D1'})
+        with open(filename, 'a') as f:
+            f.writelines(['[esptool]\n', 'custom_reset_sequence = R1|D1\n'])
+        # run monitor
+        _, err = self.run_monitor_async(args=['--no-reset'])
+        # reset into bootloader
+        self.send_control('TP')
+        # wait for command to apply
+        time.sleep(0.5)
+        assert self.close_monitor_async() == 0
+
+        with open(err, 'r') as f_err:
+            stderr = f_err.read()
+        msg = f'--- Using custom reset sequence config file: {os.path.join(os.getcwd(), "config.cfg")}'
+        assert msg in stderr
+        # remove everything before message about using custom config to remove starting reset sequence
+        log_seq = stderr.split(msg)[1]
+        # check in pyserial log that custom reset sequence was used (Note: we cannot test the wait part)
+        my_seq = [
+            'INFO:pySerial.socket:ignored _update_rts_state(1)',  # R1
+            'INFO:pySerial.socket:ignored _update_dtr_state(False)',  # expected workaround for windows RTS setting
+            'INFO:pySerial.socket:ignored _update_rts_state(0)',  # R0
+            'INFO:pySerial.socket:ignored _update_dtr_state(False)',  # expected workaround for windows RTS setting
+            'INFO:pySerial.socket:ignored _update_dtr_state(1)',  # D1
+        ]
+        assert '\n'.join(my_seq) in log_seq
+
+    def test_invalid_custom_sequence(self):
         """Use invalid custom reset sequence"""
         # create custom config with custom reset sequence
-        self.create_config({'custom_reset_sequence': 'FOO'}, section='esptool')
+        self.create_config({'custom_reset_sequence': 'FOO'})
         # run monitor
         _, err = self.run_monitor_async()
         # reset into bootloader
@@ -310,5 +340,5 @@ class TestConfig(TestBaseClass):
         with open(err, 'r') as f_err:
             stderr = f_err.read()
         # check for error message that reset sequence was invalid
-        assert f'--- Using custom reset sequence from esptool config file: {os.path.join(os.getcwd(), "config.cfg")}' in stderr
+        assert f'--- Using custom reset sequence config file: {os.path.join(os.getcwd(), "config.cfg")}' in stderr
         assert 'Invalid "custom_reset_sequence" option format: \'F\'' in stderr
