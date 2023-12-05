@@ -150,7 +150,7 @@ test_idf_monitor:
   script:
     - cd test/host_test
     # don't use the configuration file
-    - pytest -c /dev/null test_monitor.py
+    - pytest -v -c /dev/null test_monitor.py
 
 .before_script_pytest_jobs:
   before_script:

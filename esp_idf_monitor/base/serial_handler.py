@@ -9,6 +9,7 @@ import subprocess
 from typing import Callable, List, Optional  # noqa: F401
 
 import serial  # noqa: F401
+from esp_idf_panic_decoder import PanicOutputDecoder
 from serial.tools import miniterm  # noqa: F401
 
 from .console_parser import (ConsoleParser, key_description,  # noqa: F401
@@ -62,8 +63,8 @@ class SerialHandler:
     The class is responsible for buffering serial input and performing corresponding commands.
     """
     def __init__(self, last_line_part, serial_check_exit, logger, decode_panic, reading_panic, panic_buffer, target,
-                 force_line_print, start_cmd_sent, serial_instance, encrypted, elf_file):
-        # type: (bytes, bool, Logger, str, int, bytes,str, bool, bool, serial.Serial, bool, str) -> None
+                 force_line_print, start_cmd_sent, serial_instance, encrypted, elf_file, toolchain_prefix):
+        # type: (bytes, bool, Logger, str, int, bytes, str, bool, bool, serial.Serial, bool, str, str) -> None
         self._last_line_part = last_line_part
         self._serial_check_exit = serial_check_exit
         self.logger = logger
@@ -78,6 +79,7 @@ class SerialHandler:
         self.elf_file = elf_file
         self.decode_error_cnt = 0
         self.reset = Reset(serial_instance, target)
+        self.panic_handler = PanicOutputDecoder(toolchain_prefix, elf_file, target)
 
     def splitdata(self, data):  # type: (bytes) -> List[bytes]
         """
@@ -109,8 +111,8 @@ class SerialHandler:
             line_strip = line.strip()
             if self._serial_check_exit and line_strip == EXIT_KEY.encode('latin-1'):
                 raise SerialStopException()
-            if gdb_helper:
-                self.check_panic_decode_trigger(line_strip, gdb_helper)
+            if self.target != 'linux':
+                self.check_panic_decode_trigger(line_strip)
             with coredump.check(line_strip):
                 try:
                     decoded_line = line.decode()
@@ -159,7 +161,7 @@ class SerialHandler:
         # else: keeping _last_line_part and it will be processed the next time
         # handle_serial_input is invoked
 
-    def check_panic_decode_trigger(self, line, gdb_helper):  # type: (bytes, GDBHelper) -> None
+    def check_panic_decode_trigger(self, line):  # type: (bytes) -> None
         if self._decode_panic == PANIC_DECODE_DISABLE:
             return
 
@@ -177,8 +179,12 @@ class SerialHandler:
             self._reading_panic = PANIC_IDLE
             self.logger.output_enabled = True
             try:
-                gdb_helper.process_panic_output(self._panic_buffer, self.logger, self.target)
-            except subprocess.CalledProcessError:
+                out = self.panic_handler.process_panic_output(self._panic_buffer)
+                if out:
+                    yellow_print('\nBacktrace:\n\n')
+                    self.logger.print(out)
+            except subprocess.CalledProcessError as e:
+                yellow_print(f'Failed to run gdb_panic_server.py script: {e}\n{e.output}\n\n')
                 # in case of error, print the rest of panic buffer that wasn't logged yet
                 # we stopped logging with PANIC_STACK_DUMP and reenabled logging with PANIC_END
                 l_idx = self._panic_buffer.find(PANIC_STACK_DUMP)

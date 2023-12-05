@@ -1,13 +1,9 @@
 # SPDX-FileCopyrightText: 2023 Espressif Systems (Shanghai) CO LTD
 # SPDX-License-Identifier: Apache-2.0
-import os
 import re
 import subprocess
-import sys
-import tempfile
 from typing import Optional  # noqa: F401
 
-from .constants import PANIC_OUTPUT_DECODE_SCRIPT
 from .logger import Logger  # noqa: F401
 from .output_helpers import normal_print, red_print, yellow_print
 from .web_socket_client import WebSocketClient  # noqa: F401
@@ -103,30 +99,3 @@ class GDBHelper:
             else:
                 red_print('Malformed gdb message... calculated checksum %02x received %02x' % (chsum, calc_chsum))
         return False
-
-    def process_panic_output(self, panic_output, logger, target):  # type: (bytes, Logger, str) -> None
-        panic_output_file = None
-        try:
-            # On Windows, the temporary file can't be read unless it is closed.
-            # Set delete=False and delete the file manually later.
-            with tempfile.NamedTemporaryFile(mode='wb', delete=False) as panic_output_file:
-                panic_output_file.write(panic_output)
-                panic_output_file.flush()
-            cmd = [self.toolchain_prefix + 'gdb',
-                   '--batch', '-n',
-                   self.elf_file,
-                   '-ex', f'target remote | "{sys.executable}" -m "{PANIC_OUTPUT_DECODE_SCRIPT}" '
-                   f'--target {target} "{panic_output_file.name}"',
-                   '-ex', 'bt']
-            output = subprocess.check_output(cmd, stderr=subprocess.STDOUT)
-            yellow_print('\nBacktrace:\n\n')
-            logger.print(output)
-        except subprocess.CalledProcessError as e:
-            red_print(f'Failed to run gdb_panic_server.py script: {e}\n{e.output}\n\n')
-            raise
-        finally:
-            if panic_output_file is not None:
-                try:
-                    os.unlink(panic_output_file.name)
-                except OSError as e:
-                    yellow_print(f'Couldn\'t remove temporary panic output file ({e})')

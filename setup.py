@@ -38,8 +38,7 @@ setup(
     install_requires=[
         'pyserial>=3.3',
         'esp-coredump~=1.2',
-        'pyelftools',
-        'esp-idf-panic-decoder',
+        'esp-idf-panic-decoder~=1.0',
     ],
     extras_require={
         'dev': [
@@ -76,6 +75,7 @@ setup(
         'Programming Language :: Python :: 3.9',
         'Programming Language :: Python :: 3.10',
         'Programming Language :: Python :: 3.11',
+        'Programming Language :: Python :: 3.12',
         'Operating System :: POSIX',
         'Operating System :: Microsoft :: Windows',
         'Operating System :: MacOS :: MacOS X',
