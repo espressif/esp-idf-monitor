@@ -2,12 +2,42 @@ import logging
 import os
 import sys
 from datetime import datetime
-from typing import Callable, Optional
+from typing import Any, Callable, List, Optional
 
 import pytest
 from pytest_embedded.plugin import multi_dut_argument, multi_dut_fixture
 
 DEFAULT_SDKCONFIG = 'default'
+
+
+def get_param(item: pytest.Function, key: str, default: Any = None) -> Any:
+    # implement like this since this is a limitation of pytest, couldn't get fixture values while collecting
+    # https://github.com/pytest-dev/pytest/discussions/9689
+    if not hasattr(item, 'callspec'):
+        return default
+
+    return item.callspec.params.get(key, default) or default
+
+
+def pytest_collection_modifyitems(session: pytest.Session, config: pytest.Config, items: List[pytest.Item]):
+    """Modify test collection based on selected target"""
+    target = config.getoption('--target')
+
+    # Filter the test cases
+    filtered_items = []
+    for item in items:
+        # filter by target
+        all_markers = [marker.name for marker in item.iter_markers()]
+        if target not in all_markers:
+            continue
+
+        filtered_items.append(item)
+
+    # sort the test cases with (app folder, config)
+    items[:] = sorted(
+        filtered_items,
+        key=lambda x: (os.path.dirname(x.path), get_param(x, 'config', DEFAULT_SDKCONFIG))
+    )
 
 
 @pytest.fixture(scope='session', autouse=True)
