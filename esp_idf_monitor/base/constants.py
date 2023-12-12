@@ -1,8 +1,6 @@
 # SPDX-FileCopyrightText: 2015-2023 Espressif Systems (Shanghai) CO LTD
 # SPDX-License-Identifier: Apache-2.0
 
-import re
-
 # Control-key characters
 CTRL_C = '\x03'
 CTRL_H = '\x08'
@@ -25,12 +23,6 @@ TAG_KEY = 0
 TAG_SERIAL = 1
 TAG_SERIAL_FLUSH = 2
 TAG_CMD = 3
-
-# paths to scripts
-PANIC_OUTPUT_DECODE_SCRIPT = 'esp_idf_panic_decoder'
-
-# regex matches an potential address
-ADDRESS_RE = re.compile(r'0x[0-9a-f]{8}', re.IGNORECASE)
 
 DEFAULT_TOOLCHAIN_PREFIX = 'xtensa-esp32-elf-'
 

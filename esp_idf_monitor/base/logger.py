@@ -3,45 +3,38 @@
 
 import datetime
 import os
-import re
 from typing import AnyStr, BinaryIO, Callable, Optional  # noqa: F401
 
+from esp_idf_panic_decoder import PcAddressDecoder
 from serial.tools import miniterm  # noqa: F401
 
 from esp_idf_monitor.base.key_config import MENU_KEY, TOGGLE_OUTPUT_KEY
 
-from .constants import ADDRESS_RE
-from .output_helpers import lookup_pc_address, red_print, yellow_print
-from .pc_address_matcher import PcAddressMatcher
+from .output_helpers import red_print, yellow_print
 
 
 class Logger:
-    def __init__(self, elf_file, console, timestamps, timestamp_format, pc_address_buffer, enable_address_decoding,
+    def __init__(self, elf_file, console, timestamps, timestamp_format, enable_address_decoding,
                  toolchain_prefix, rom_elf_file=None):
-        # type: (str, miniterm.Console, bool, str, bytes, bool, str, Optional[str]) -> None
+        # type: (str, miniterm.Console, bool, str, bool, str, Optional[str]) -> None
         self.log_file = None  # type: Optional[BinaryIO]
         self._output_enabled = True  # type: bool
         self._start_of_line = True  # type: bool
         self.elf_file = elf_file
-        self.rom_elf_file = rom_elf_file
         self.console = console
         self.timestamps = timestamps
         self.timestamp_format = timestamp_format
-        self._pc_address_buffer = pc_address_buffer
-        self.enable_address_decoding = enable_address_decoding
-        self.toolchain_prefix = toolchain_prefix
         if enable_address_decoding:
-            self.pc_address_matcher = PcAddressMatcher(self.elf_file)
-            if rom_elf_file is not None:
-                self.rom_pc_address_matcher = PcAddressMatcher(self.rom_elf_file)  # type: ignore
+            self.pc_address_decoder = PcAddressDecoder(toolchain_prefix, elf_file, rom_elf_file)
 
     @property
-    def pc_address_buffer(self):  # type: () -> bytes
-        return self._pc_address_buffer
+    def pc_address_buffer(self) -> bytes:
+        return getattr(self.pc_address_decoder, 'pc_address_buffer', b'')
 
     @pc_address_buffer.setter
-    def pc_address_buffer(self, value):  # type: (bytes) -> None
-        self._pc_address_buffer = value
+    def pc_address_buffer(self, value: bytes) -> None:
+        if self.pc_address_decoder:
+            self.pc_address_decoder.pc_address_buffer = value
 
     @property
     def output_enabled(self):  # type: () -> bool
@@ -142,23 +135,9 @@ class Logger:
         yellow_print(f'\nToggle output display: {self.output_enabled}, '
                      f'Type {MENU_KEY} {TOGGLE_OUTPUT_KEY} to show/disable output again.')
 
-    def handle_possible_pc_address_in_line(self, line):  # type: (bytes) -> None
-        line = self._pc_address_buffer + line
-        self._pc_address_buffer = b''
-        if not self.enable_address_decoding:
+    def handle_possible_pc_address_in_line(self, line: bytes) -> None:
+        if not self.pc_address_decoder:
             return
-        for m in re.finditer(ADDRESS_RE, line.decode(errors='ignore')):
-            num = m.group()
-            address_int = int(num, 16)
-            translation = None
-
-            # Try looking for the address in the app ELF file
-            if self.pc_address_matcher.is_executable_address(address_int):
-                translation = lookup_pc_address(num, self.toolchain_prefix, self.elf_file)
-            # Not found in app ELF file, check ROM ELF file (if it is available)
-            if translation is None and self.rom_elf_file is not None and self.rom_pc_address_matcher.is_executable_address(address_int):
-                translation = lookup_pc_address(num, self.toolchain_prefix, self.rom_elf_file, is_rom=True)
-
-            # Translation found either in the app or ROM ELF file
-            if translation is not None:
-                self.print(translation, console_printer=yellow_print)
+        translation = self.pc_address_decoder.decode_address(line)
+        if translation:
+            self.print(translation, console_printer=yellow_print)

@@ -1,7 +1,6 @@
 # SPDX-FileCopyrightText: 2015-2023 Espressif Systems (Shanghai) CO LTD
 # SPDX-License-Identifier: Apache-2.0
 
-import subprocess
 import sys
 from typing import Optional  # noqa: F401
 
@@ -27,16 +26,3 @@ def yellow_print(message, newline='\n'):  # type: (str, Optional[str]) -> None
 
 def red_print(message, newline='\n'):  # type: (str, Optional[str]) -> None
     color_print(message, ANSI_RED, newline)
-
-
-def lookup_pc_address(pc_addr, toolchain_prefix, elf_file, is_rom=False):  # type: (str, str, str, bool) -> Optional[str]
-    cmd = ['%saddr2line' % toolchain_prefix, '-pfiaC', '-e', elf_file, pc_addr]
-
-    try:
-        translation = subprocess.check_output(cmd, cwd='.')
-        if b'?? ??:0' not in translation:
-            decoded = translation.decode()
-            return decoded if not is_rom else decoded.replace('at ??:?', 'in ROM')
-    except OSError as e:
-        red_print('%s: %s' % (' '.join(cmd), e))
-    return None
