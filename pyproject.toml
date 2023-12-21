@@ -1,0 +1,75 @@
+[build-system]
+requires = ["setuptools>=61.2"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "esp-idf-monitor"
+authors = [{name = "Espressif Systems"}]
+description = "Serial monitor for esp-idf"
+keywords = ["espressif", "embedded", "monitor", "serial"]
+classifiers = [
+    "Development Status :: 5 - Production/Stable",
+    "Intended Audience :: Developers",
+    "Natural Language :: English",
+    "Environment :: Console",
+    "Topic :: Software Development :: Embedded Systems",
+    "License :: OSI Approved :: Apache Software License",
+    "Programming Language :: Python :: 3.7",
+    "Programming Language :: Python :: 3.8",
+    "Programming Language :: Python :: 3.9",
+    "Programming Language :: Python :: 3.10",
+    "Programming Language :: Python :: 3.11",
+    "Programming Language :: Python :: 3.12",
+    "Operating System :: POSIX",
+    "Operating System :: Microsoft :: Windows",
+    "Operating System :: MacOS :: MacOS X",
+]
+requires-python = ">=3.7"
+dynamic = ['version']
+dependencies = [
+    "pyserial>=3.3",
+    "esp-coredump~=1.2",
+    "esp-idf-panic-decoder~=1.0",
+]
+
+[project.readme]
+file = "README.md"
+content-type = "text/markdown"
+
+[project.urls]
+Homepage = "https://github.com/espressif/esp-idf-monitor"
+
+[project.optional-dependencies]
+dev = ["pre-commit"]
+ide = ["websocket-client"]
+target_test = [
+    "SimpleWebSocketServer",
+    "pytest",
+    "pytest_embedded",
+    "pytest_embedded_idf",
+    "pytest_embedded_serial_esp",
+    "idf_build_apps~=1.0.1",
+    "idf-component-manager",
+]
+host_test = [
+    "pytest",
+    "pytest-rerunfailures",
+    "esptool"
+]
+
+[tool.setuptools]
+include-package-data = false
+
+[tool.setuptools.packages]
+find = {namespaces = false}
+
+[tool.setuptools.dynamic]
+version = {attr = "esp_idf_monitor.__version__"}
+
+[tool.mypy]
+    disallow_incomplete_defs = false # Disallows defining functions with incomplete type annotations
+    disallow_untyped_defs    = false # Disallows defining functions without type annotations or with incomplete type annotations
+    ignore_missing_imports   = true  # Suppress error messages about imports that cannot be resolved
+    python_version           = "3.9" # Specifies the Python version used to parse and check the target program
+    warn_no_return           = true  # Shows errors for missing return statements on some execution paths
+    warn_return_any          = true  # Shows a warning when returning a value with type Any from a function declared with a non- Any return type
