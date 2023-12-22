@@ -1,9 +1,8 @@
 name: PyPI release
 
 on:
-  push:
-    branches:
-      - master
+  release:
+    types: [released]
 
 jobs:
   build_and_upload:
@@ -27,7 +26,7 @@ jobs:
         TWINE_PASSWORD: ${{ secrets.PYPI_PROJECT_TOKEN }}
       run: |
         PUBLISHED_VERSION=$(curl https://pypi.org/pypi/esp-idf-monitor/json 2>/dev/null | jq -r '.info.version')
-        CURRENT_VERSION=$(python setup.py --version 2>/dev/null)
+        CURRENT_VERSION=$(python -c "from esp_idf_monitor import __version__; print(__version__)")
         if [ "$PUBLISHED_VERSION" == "$CURRENT_VERSION" ]; then
           echo "Version ${PUBLISHED_VERSION} already published, skipping..."
           exit 0
