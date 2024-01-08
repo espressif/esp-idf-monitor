@@ -67,7 +67,8 @@ class SerialReader(Reader):
                     while self.alive:  # so that exiting monitor works while waiting
                         try:
                             time.sleep(RECONNECT_DELAY)
-                            self.open_serial(self.reset)
+                            # reset on reconnect can be unexpected for wakeup from deepsleep using JTAG
+                            self.open_serial(reset=False)
                             break  # device connected
                         except serial.serialutil.SerialException:
                             yellow_print('.', newline='')
