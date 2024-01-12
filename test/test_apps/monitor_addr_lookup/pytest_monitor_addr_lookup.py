@@ -10,7 +10,7 @@ from pytest_embedded import Dut
 
 
 @pytest.mark.generic
-@pytest.mark.supported_targets
+@pytest.mark.esp32
 @pytest.mark.parametrize('config', [
     'addr_lookup_in_app',
     'addr_lookup_in_ROM',

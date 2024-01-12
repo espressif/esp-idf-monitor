@@ -7,7 +7,7 @@ stages:
 
 variables:
   # System environment
-  TARGET_TEST_ENV_IMAGE: "$CI_DOCKER_REGISTRY/target-test-env-v5.2:2"
+  TARGET_TEST_ENV_IMAGE: "${CI_DOCKER_REGISTRY}/target-test-env-v5.3:1"
   TEST_DIR: "$CI_PROJECT_DIR/test"
 
 include:
@@ -112,10 +112,20 @@ workflow:
 
 build_idf_latest:
   extends: .build_pytest_template
+  variables:
+    IDF_BRANCH: "master"  # for filtering tests in .build-test-rules.yml
   image: espressif/idf:latest
+
+build_idf_v5.2:
+  extends: .build_pytest_template
+  variables:
+    IDF_BRANCH: "release/v5.2"  # for filtering tests in .build-test-rules.yml
+  image: espressif/idf:release-v5.2
 
 build_idf_v5.1:
   extends: .build_pytest_template
+  variables:
+    IDF_BRANCH: "release/v5.1"  # for filtering tests in .build-test-rules.yml
   image: espressif/idf:release-v5.1
 # ------------------------------------------------------------------------------------------------------
 
@@ -168,12 +178,8 @@ test_idf_monitor:
   image: ${TARGET_TEST_ENV_IMAGE}
   extends:
     - .before_script_pytest_jobs
-  tags:
-    - generic
-    - esp32
   artifacts:
     paths:
-      - "${TEST_DIR}/*/*.log"
       - "${TEST_DIR}/results_*.xml"
       - "${TEST_DIR}/*.txt"
       - "${TEST_DIR}/test_apps/pytest_embedded_log/"
@@ -188,9 +194,40 @@ test_idf_monitor:
 
 test_target_apps:
   extends: .test_template
+  tags:
+    - generic
+    - esp32
   parallel:
     matrix:
-      - IDF_BRANCH: ["release/v5.1", "master"]
+      - IDF_BRANCH: ["release/v5.1", "release/v5.2", "master"]
         IDF_TARGET: ["esp32"]
+
+
+test_linux_apps:
+  extends: .test_template
+  image: espressif/idf:latest
+  tags:
+    - build
+  variables:
+    IDF_TARGET: "linux"
+  parallel:
+    matrix:
+      - IDF_BRANCH: ["master"]
+  script:
+    - cd ${TEST_DIR}
+    - python -m idf_build_apps build -v -p .
+      --recursive
+      --target linux
+      --config "sdkconfig.ci.*=" --build-dir "build_@t_@w"
+      --check-warnings
+      --ignore-warning-file ignore_build_warnings.txt
+      --collect-size-info size_info.txt
+      --manifest-rootpath .
+      --manifest-file .build-test-rules.yml
+      --parallel-count ${CI_NODE_TOTAL:-1}
+      --parallel-index ${CI_NODE_INDEX:-1}
+    - IDF_VERSION=$(echo $IDF_BRANCH | tr / _)
+    - python -m pytest --junit-xml=${TEST_DIR}/results_${IDF_TARGET}_${IDF_VERSION}.xml --target=linux
+
 
 # ------------------------------------------------------------------------------------------------------
