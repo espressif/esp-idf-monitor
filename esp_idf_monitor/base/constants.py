@@ -27,6 +27,7 @@ TAG_CMD = 3
 DEFAULT_TOOLCHAIN_PREFIX = 'xtensa-esp32-elf-'
 
 DEFAULT_PRINT_FILTER = ''
+DEFAULT_TARGET_RESET = True
 
 # panic handler related messages
 PANIC_START = r'Core \s*\d+ register dump:'

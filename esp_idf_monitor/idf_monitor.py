@@ -41,6 +41,7 @@ from esp_idf_monitor.base.console_parser import ConsoleParser
 from esp_idf_monitor.base.console_reader import ConsoleReader
 from esp_idf_monitor.base.constants import (CTRL_C, CTRL_H,
                                             DEFAULT_PRINT_FILTER,
+                                            DEFAULT_TARGET_RESET,
                                             DEFAULT_TOOLCHAIN_PREFIX,
                                             ESPPORT_ENVIRON,
                                             EVENT_QUEUE_TIMEOUT,
@@ -88,7 +89,7 @@ class Monitor:
         print_filter,  # type: str
         make='make',  # type: str
         encrypted=False,  # type: bool
-        reset=True,  # type: bool
+        reset=DEFAULT_TARGET_RESET,  # type: bool
         toolchain_prefix=DEFAULT_TOOLCHAIN_PREFIX,  # type: str
         eol='CRLF',  # type: str
         decode_coredumps=COREDUMP_DECODE_INFO,  # type: str
