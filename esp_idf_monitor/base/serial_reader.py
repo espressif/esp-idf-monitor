@@ -47,7 +47,8 @@ class SerialReader(Reader):
                 # We can come to this thread at startup or from external application line GDB.
                 # If we come from GDB we would like to continue to run without reset.
                 self.open_serial(reset=not self.gdb_exit and self.reset)
-            except serial.serialutil.SerialException:
+            except serial.SerialException as e:
+                print(e)
                 # if connection to port fails suggest other available ports
                 port_list = '\n'.join([p.device for p in list_ports.comports()])
                 yellow_print(f'Connection to {self.serial.portstr} failed. Available ports:\n{port_list}')
@@ -57,7 +58,7 @@ class SerialReader(Reader):
             while self.alive:
                 try:
                     data = self.serial.read(self.serial.in_waiting or 1)
-                except (serial.serialutil.SerialException, IOError) as e:
+                except (serial.SerialException, IOError) as e:
                     data = b''
                     # self.serial.open() was successful before, therefore, this is an issue related to
                     # the disappearance of the device
@@ -70,7 +71,7 @@ class SerialReader(Reader):
                             # reset on reconnect can be unexpected for wakeup from deepsleep using JTAG
                             self.open_serial(reset=False)
                             break  # device connected
-                        except serial.serialutil.SerialException:
+                        except serial.SerialException:
                             yellow_print('.', newline='')
                             sys.stderr.flush()
                     yellow_print('')  # go to new line
