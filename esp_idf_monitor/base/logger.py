@@ -6,11 +6,13 @@ import os
 from typing import AnyStr, BinaryIO, Callable, Optional  # noqa: F401
 
 from esp_idf_panic_decoder import PcAddressDecoder
-from serial.tools import miniterm  # noqa: F401
+from serial.tools import miniterm
 
 from esp_idf_monitor.base.key_config import MENU_KEY, TOGGLE_OUTPUT_KEY
 
 from .output_helpers import red_print, yellow_print
+
+key_description = miniterm.key_description
 
 
 class Logger:
@@ -133,7 +135,8 @@ class Logger:
     def output_toggle(self):  # type: () -> None
         self.output_enabled = not self.output_enabled
         yellow_print(f'\nToggle output display: {self.output_enabled}, '
-                     f'Type {MENU_KEY} {TOGGLE_OUTPUT_KEY} to show/disable output again.')
+                     f'Type {key_description(MENU_KEY)} {key_description(TOGGLE_OUTPUT_KEY)} '
+                     'to show/disable output again.')
 
     def handle_possible_pc_address_in_line(self, line: bytes) -> None:
         if not self.pc_address_decoder:
