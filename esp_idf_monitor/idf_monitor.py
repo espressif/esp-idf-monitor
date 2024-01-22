@@ -384,7 +384,7 @@ def main() -> None:
                 yellow_print('--- WARNING: Serial ports accessed as /dev/tty.* will hang gdb if launched.')
                 yellow_print(f'--- Using {port} instead...')
 
-            serial_instance = serial.serial_for_url(port, args.baud, do_not_open=True)
+            serial_instance = serial.serial_for_url(port, args.baud, do_not_open=True, exclusive=True)
             # setting write timeout is not supported for RFC2217 in pyserial
             if not port.startswith('rfc2217://'):
                 serial_instance.write_timeout = 0.3
