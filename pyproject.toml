@@ -43,6 +43,7 @@ Homepage = "https://github.com/espressif/esp-idf-monitor"
 dev = [
     "pre-commit",
     "commitizen",
+    "coverage[toml]",
 ]
 ide = ["websocket-client"]
 target_test = [
@@ -51,7 +52,7 @@ target_test = [
     "pytest_embedded",
     "pytest_embedded_idf",
     "pytest_embedded_serial_esp",
-    "idf_build_apps~=1.0.1",
+    "idf_build_apps",
     "idf-component-manager",
 ]
 host_test = [
@@ -101,3 +102,7 @@ perf = "Performance Improvements"
     python_version           = "3.9" # Specifies the Python version used to parse and check the target program
     warn_no_return           = true  # Shows errors for missing return statements on some execution paths
     warn_return_any          = true  # Shows a warning when returning a value with type Any from a function declared with a non- Any return type
+
+[tool.coverage.run]
+parallel = true
+source = ["../esp_idf_monitor/"]

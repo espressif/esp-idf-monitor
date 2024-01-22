@@ -15,6 +15,9 @@ test/test_apps/pytest_embedded_log/
 # Log files
 **/log.*\.txt
 
+# Coverage
+**/.coverage*
+
 esp_idf_monitor.egg-info
 .eggs
 

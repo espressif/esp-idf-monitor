@@ -1,8 +1,9 @@
 # SPDX-FileCopyrightText: 2023 Espressif Systems (Shanghai) CO LTD
 # SPDX-License-Identifier: Unlicense OR CC0-1.0
+import itertools
 import os
 import re
-import sys
+from typing import List
 
 import pexpect
 import pytest
@@ -15,12 +16,13 @@ from pytest_embedded import Dut
     'addr_lookup_in_app',
     'addr_lookup_in_ROM',
 ], indirect=True)
-def test_monitor_addr_lookup(config: str, dut: Dut) -> None:
+def test_monitor_addr_lookup(config: str, coverage_run: List[str], dut: Dut) -> None:
     # The port needs to be closed because esp_idf_monitor will connect to it
-    dut.serial.stop_redirect_thread()
+    dut.serial.close()
 
-    monitor_cmd = ' '.join([sys.executable, '-m', 'esp_idf_monitor', os.path.join(dut.app.binary_path, 'monitor_addr_lookup.elf'),
-                            '--port', str(dut.serial.port)])
+    monitor_cmd = ' '.join(itertools.chain(
+        coverage_run, ['-m', 'esp_idf_monitor', os.path.join(dut.app.binary_path, 'monitor_addr_lookup.elf'), '--port', str(dut.serial.port)]
+    ))
     monitor_log_path = os.path.join(dut.logdir, 'monitor.txt')
 
     with open(monitor_log_path, 'w') as log, pexpect.spawn(monitor_cmd, logfile=log, timeout=5, encoding='utf-8', codec_errors='ignore') as p:
@@ -58,3 +60,7 @@ def test_monitor_addr_lookup(config: str, dut: Dut) -> None:
             p.expect(re.compile(rf'({ADDRESS}): ({FUNC_NAME}) in ROM'))
             addr, func = p.match.group(1), p.match.group(2)
             p.expect_exact(f'{addr}: {func} in ROM')
+
+        # end monitor and wait for proper termination to ensure complete coverage report
+        p.sendcontrol(']')
+        p.expect_exact(pexpect.EOF)

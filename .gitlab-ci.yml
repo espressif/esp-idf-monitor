@@ -3,6 +3,7 @@ stages:
   - host_test
   - build
   - target_test
+  - report
 
 variables:
   # System environment
@@ -69,7 +70,7 @@ workflow:
 #
 .before_script_build_jobs:
   before_script:
-    - pip install .[dev,target_test] --prefer-binary
+    - pip install -e .[dev,target_test] --prefer-binary
 
 .build_pytest_template:
   stage: build
@@ -98,7 +99,7 @@ workflow:
     - cd ${TEST_DIR}
     - python -m idf_build_apps build -v -p .
       --recursive
-      --target all
+      --target ${TEST_TARGETS}
       --default-build-targets ${TEST_TARGETS}
       --config "sdkconfig.ci.*=" --build-dir "build_@t_@w"
       --check-warnings
@@ -157,20 +158,26 @@ test_idf_monitor:
     when: always
     paths:
       - test/host_test/outputs/*
+      - "**/.coverage*"
+      - ".coverage*"
     expire_in: 1 week
+  variables:
+    PYTHONPATH: "$PYTHONPATH:${TEST_DIR}"
+    COVERAGE_PROCESS_START: "${CI_PROJECT_DIR}/pyproject.toml"
   script:
     - cd ${TEST_DIR}
     # don't use the configuration file
-    - pytest -v -c /dev/null host_test/test_monitor.py
+    - coverage run -m pytest -sv -c /dev/null host_test/test_monitor.py
 
 .before_script_pytest_jobs:
   before_script:
-    - pip install .[target_test] --prefer-binary
+    - pip install -e .[dev,target_test] --prefer-binary
     # Get ESP-IDF and install the tools (such as addr2line). We don't need the whole ESP-IDF, but it is easier for downloading required tools.
     # Dowloading just the tools would require recreating the directory structure and downloading dependencies one by one.
     - cd /opt/
     - git clone --depth 1 -b ${IDF_BRANCH} https://gitlab-ci-token:${ESPCI_TOKEN}@${GITLAB_HTTPS_HOST}/espressif/esp-idf.git
     - cd esp-idf
+    - echo "Using ESP-IDF branch ${IDF_BRANCH} on commit $(git rev-parse --short HEAD)"
     - export IDF_PATH=${PWD}
     - tools/idf_tools.py --non-interactive install && eval "$(tools/idf_tools.py --non-interactive export)" || exit 1
 
@@ -184,6 +191,8 @@ test_idf_monitor:
       - "${TEST_DIR}/results_*.xml"
       - "${TEST_DIR}/*.txt"
       - "${TEST_DIR}/test_apps/pytest_embedded_log/"
+      - "**/.coverage*"
+      - ".coverage*"
     reports:
       junit: ${TEST_DIR}/results_${IDF_TARGET}_*.xml
     when: always
@@ -191,13 +200,16 @@ test_idf_monitor:
   script:
     - cd ${TEST_DIR}
     - IDF_VERSION=$(echo $IDF_BRANCH | tr / _)
-    - python -m pytest --junit-xml=${TEST_DIR}/results_${IDF_TARGET}_${IDF_VERSION}.xml --target=${IDF_TARGET}
+    - pytest --junit-xml=${TEST_DIR}/results_${IDF_TARGET}_${IDF_VERSION}.xml --target=${IDF_TARGET}
 
 test_target_apps:
   extends: .test_template
   tags:
     - generic
     - esp32
+  variables:
+    PYTHONPATH: "$PYTHONPATH:${TEST_DIR}"
+    COVERAGE_PROCESS_START: "${CI_PROJECT_DIR}/pyproject.toml"
   parallel:
     matrix:
       - IDF_BRANCH: ["release/v5.1", "release/v5.2", "master"]
@@ -205,12 +217,13 @@ test_target_apps:
 
 
 test_linux_apps:
-  extends: .test_template
+  extends:
+    - .build_template
+    - .test_template
   image: espressif/idf:latest
-  tags:
-    - build
   variables:
     IDF_TARGET: "linux"
+    COVERAGE_PROCESS_START: "${CI_PROJECT_DIR}/pyproject.toml"
   parallel:
     matrix:
       - IDF_BRANCH: ["master"]
@@ -228,7 +241,34 @@ test_linux_apps:
       --parallel-count ${CI_NODE_TOTAL:-1}
       --parallel-index ${CI_NODE_INDEX:-1}
     - IDF_VERSION=$(echo $IDF_BRANCH | tr / _)
-    - python -m pytest --junit-xml=${TEST_DIR}/results_${IDF_TARGET}_${IDF_VERSION}.xml --target=linux
+    # setting path before running build will break the build process
+    - PYTHONPATH=$PYTHONPATH:${TEST_DIR}
+    - pytest --junit-xml=${TEST_DIR}/results_${IDF_TARGET}_${IDF_VERSION}.xml --target=linux
 
+combine_reports:
+  stage: report
+  extends: .base_template
+  artifacts:
+    reports:
+      coverage_report:
+        coverage_format: cobertura
+        path: cobertura_report.xml
+    when: always
+    paths:
+      - ".coverage*"
+      - cobertura_report.xml
+      - ./html_report/
+    expire_in: 1 week
+  coverage: '/(?i)total.*? (100(?:\.0+)?\%|[1-9]?\d(?:\.\d+)?\%)$/'
+  variables:
+    LC_ALL: C.UTF-8
+    COVERAGE_RCFILE: "${CI_PROJECT_DIR}/pyproject.toml"
+  script:
+    # all .coverage files in sub-directories are moved to the parent dir first
+    - find . -mindepth 2 -type f -name ".coverage*" -print -exec mv --backup=numbered {} . \;
+    - coverage combine
+    - coverage report --precision=2
+    - coverage html -d html_report --precision=2
+    - coverage xml -o cobertura_report.xml
 
 # ------------------------------------------------------------------------------------------------------
