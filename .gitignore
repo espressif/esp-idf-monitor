@@ -1,5 +1,5 @@
 # IDF Monitor tests
-test/host_test/outputs
+test/**/outputs
 test/test_apps/*/build
 test/test_apps/**/build_*/
 test/test_apps/**/build_*_*/

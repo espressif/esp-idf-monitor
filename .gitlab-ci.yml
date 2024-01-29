@@ -159,9 +159,9 @@ test_idf_monitor:
       - test/host_test/outputs/*
     expire_in: 1 week
   script:
-    - cd test/host_test
+    - cd ${TEST_DIR}
     # don't use the configuration file
-    - pytest -v -c /dev/null test_monitor.py
+    - pytest -v -c /dev/null host_test/test_monitor.py
 
 .before_script_pytest_jobs:
   before_script:
