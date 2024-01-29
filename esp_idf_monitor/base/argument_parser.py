@@ -5,8 +5,9 @@ import argparse
 import os
 import sys
 
-from .constants import (DEFAULT_PRINT_FILTER, DEFAULT_TOOLCHAIN_PREFIX,
-                        PANIC_DECODE_BACKTRACE, PANIC_DECODE_DISABLE)
+from .constants import (DEFAULT_PRINT_FILTER, DEFAULT_TARGET_RESET,
+                        DEFAULT_TOOLCHAIN_PREFIX, PANIC_DECODE_BACKTRACE,
+                        PANIC_DECODE_DISABLE)
 from .coredump import COREDUMP_DECODE_DISABLE, COREDUMP_DECODE_INFO
 
 
@@ -23,7 +24,8 @@ def get_parser():  # type: () -> argparse.ArgumentParser
     parser.add_argument(
         '--no-reset',
         help='Do not reset the chip on monitor startup',
-        action='store_true'
+        action='store_true',
+        default=bool(os.getenv('ESP_IDF_MONITOR_NO_RESET', not DEFAULT_TARGET_RESET))
     )
 
     parser.add_argument(
