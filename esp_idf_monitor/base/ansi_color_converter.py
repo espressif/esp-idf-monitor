@@ -5,7 +5,7 @@ import ctypes
 import os
 import re
 import sys
-from io import TextIOBase
+from io import TextIOBase  # noqa: F401
 from typing import Any, Optional, TextIO, Union  # noqa: F401
 
 from .output_helpers import ANSI_NORMAL
@@ -68,8 +68,8 @@ class ANSIColorConverter(object):
     def _output_write(self, data):  # type: (Union[str, bytes]) -> None
         try:
             if self.decode_output:
-                data = self.decode_buffer + data  # type: ignore
-                self.output.write(data.decode())  # type: ignore
+                self.decode_buffer += data  # type: ignore
+                self.output.write(self.decode_buffer.decode())  # type: ignore
                 self.decode_buffer = b''
             else:
                 self.output.write(data)  # type: ignore
@@ -82,7 +82,6 @@ class ANSIColorConverter(object):
             # (garbage bytes, etc)
             pass
         except UnicodeDecodeError:
-            self.decode_buffer += data  # type: ignore
             if len(self.decode_buffer) > 4:
                 # Multi-byte character contain up to 4 bytes and if buffer have more then 4 bytes
                 # and still can not decode it we can just ignore some bytes
