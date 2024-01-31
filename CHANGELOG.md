@@ -1,8 +1,20 @@
-## Unreleased
+## v1.4.0 (2024-01-30)
 
 ### New Features
 
+- Enable idf_monitor no_reset flag be set by environment variable
+- add port advisory locking
 - move decoding functions to esp-idf-panic-decoder
+
+### Bug Fixes
+
+- correctly decode string type in ANSIColorConverter
+- print correct shortcut in toggle output message
+- don't reset chip on reconnect
+- unbuffered read for linux target
+- **serial_reader**: don't set closing wait on already closed port
+- running monitor on linux target does not need port
+- **hard_reset**: make sure that DTR is pulled up before hard resetting the chip
 
 ## v1.3.4 (2023-11-21)
 
