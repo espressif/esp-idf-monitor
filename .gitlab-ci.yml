@@ -1,6 +1,5 @@
 stages:
   - pre-check
-  - codecheck
   - host_test
   - build
   - target_test
@@ -138,7 +137,7 @@ build_idf_v5.1:
 # CODE CHECK BY PRE-COMMIT HOOKS
 pre-commit_hooks_MR:
   extends: .base_template
-  stage: codecheck
+  stage: pre-check
   script:
     - apt-get update && apt-get install -y -q git
     - git diff-tree --no-commit-id --name-only -r $CI_COMMIT_SHA | xargs pre-commit run --files
