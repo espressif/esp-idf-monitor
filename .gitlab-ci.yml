@@ -10,6 +10,12 @@ variables:
   TARGET_TEST_ENV_IMAGE: "${CI_DOCKER_REGISTRY}/target-test-env-v5.3:1"
   TEST_DIR: "$CI_PROJECT_DIR/test"
 
+  # Install dependency from custom branch, for details see wiki.
+  # e.g. CI_PYTHON_TOOL_REPO: "esp-idf-panic-decoder"
+  # CI_PYTHON_TOOL_BRANCH: "mybranch"
+  CI_PYTHON_TOOL_REPO: ""
+  CI_PYTHON_TOOL_BRANCH: ""
+
 include:
   - project: espressif/shared-ci-dangerjs
     ref: master
@@ -32,6 +38,13 @@ workflow:
 
 # TEMPLATES
 # ------------------------------------------------------------------------------------------------------
+.install_custom_tool: &install_custom_tool |
+  if [[ -n "$CI_PYTHON_TOOL_REPO" ]]; then
+    git clone --quiet --depth=1 -b ${CI_PYTHON_TOOL_BRANCH} https://gitlab-ci-token:${ESPCI_TOKEN}@${GITLAB_HTTPS_HOST}/espressif/${CI_PYTHON_TOOL_REPO}.git
+    pip install ./${CI_PYTHON_TOOL_REPO}
+    rm -rf ${CI_PYTHON_TOOL_REPO}
+  fi
+
 .base_template:
   image: python:3.7-bullseye
   tags:
@@ -39,6 +52,7 @@ workflow:
     - internet
   before_script:
     - pip install -e .[dev] --prefer-binary
+    - *install_custom_tool
 
 .idf_template:
   image: "espressif/idf:latest"
@@ -47,6 +61,7 @@ workflow:
     - internet
   before_script:
     - pip install -e .[dev,host_test] --prefer-binary
+    - *install_custom_tool
 
 .build_template:
   stage: build
@@ -71,6 +86,7 @@ workflow:
 .before_script_build_jobs:
   before_script:
     - pip install -e .[dev,target_test] --prefer-binary
+    - *install_custom_tool
 
 .build_pytest_template:
   stage: build
@@ -172,6 +188,7 @@ test_idf_monitor:
 .before_script_pytest_jobs:
   before_script:
     - pip install -e .[dev,target_test] --prefer-binary
+    - *install_custom_tool
     # Get ESP-IDF and install the tools (such as addr2line). We don't need the whole ESP-IDF, but it is easier for downloading required tools.
     # Dowloading just the tools would require recreating the directory structure and downloading dependencies one by one.
     - cd /opt/
