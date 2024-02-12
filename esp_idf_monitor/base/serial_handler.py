@@ -121,7 +121,7 @@ class SerialHandler:
                     decoded_line = line_strip.decode(errors='ignore')
                     self.decode_error_cnt += 1
                     if self.decode_error_cnt >= 3:
-                        yellow_print('Multiple decode errors occured: Try checking the baud rate and XTAL frequency setting in menuconfig')
+                        yellow_print('Multiple decode errors occurred: Try checking the baud rate and XTAL frequency setting in menuconfig')
                         self.decode_error_cnt = 0
                 if self._force_line_print or line_matcher.match(decoded_line):
                     self.logger.print(line)
@@ -186,7 +186,7 @@ class SerialHandler:
             except subprocess.CalledProcessError as e:
                 yellow_print(f'Failed to run gdb_panic_server.py script: {e}\n{e.output}\n\n')
                 # in case of error, print the rest of panic buffer that wasn't logged yet
-                # we stopped logging with PANIC_STACK_DUMP and reenabled logging with PANIC_END
+                # we stopped logging with PANIC_STACK_DUMP and re-enabled logging with PANIC_END
                 l_idx = self._panic_buffer.find(PANIC_STACK_DUMP)
                 r_idx = self._panic_buffer.find(PANIC_END)
                 self.logger.print(self._panic_buffer[l_idx:r_idx])

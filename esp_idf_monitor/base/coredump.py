@@ -80,7 +80,7 @@ class CoreDump:
                 output = f.getvalue()
                 self.logger.output_enabled = True
                 self.logger.print(output.encode('utf-8'))
-                self.logger.output_enabled = False  # Will be reenabled in check_coredump_trigger_after_print
+                self.logger.output_enabled = False  # Will be re-enabled in check_coredump_trigger_after_print
         if coredump_file is not None:
             try:
                 os.unlink(coredump_file.name)

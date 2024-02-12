@@ -266,7 +266,7 @@ class TestConfig(TestBaseClass):
         # check that stderr has message that config was not correct and fallback option works
         assert '--- Ignoring unknown configuration options: foo' in stderr
         assert "--- Error: Unsupported configuration for key: '.', please use just the English alphabet " \
-            "charactes (A-Z) and [,],\\,^,_. Using the default option 'R'." in stderr
+            "characters (A-Z) and [,],\\,^,_. Using the default option 'R'." in stderr
 
     def test_esptool_sequence(self):
         """Use custom reset sequence to reset into bootloader"""
