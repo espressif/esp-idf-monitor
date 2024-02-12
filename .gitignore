@@ -1,5 +1,5 @@
 # IDF Monitor tests
-test/host_test/outputs
+test/**/outputs
 test/test_apps/*/build
 test/test_apps/**/build_*/
 test/test_apps/**/build_*_*/
@@ -14,6 +14,9 @@ test/test_apps/pytest_embedded_log/
 
 # Log files
 **/log.*\.txt
+
+# Coverage
+**/.coverage*
 
 esp_idf_monitor.egg-info
 .eggs

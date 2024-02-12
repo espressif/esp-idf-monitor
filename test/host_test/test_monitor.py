@@ -15,11 +15,12 @@ import time
 from typing import Dict, List, Optional, Tuple
 
 import pytest
-from conftest import out_dir
+
+from .conftest import out_dir
 
 HOST = 'localhost'
 
-IN_DIR = 'inputs/'    # input files for tests
+IN_DIR = os.path.join(os.path.abspath(os.path.dirname(__file__)), 'inputs')  # input files for tests
 EXIT_KEY = b'\x1d\n'  # CTRL+]
 
 

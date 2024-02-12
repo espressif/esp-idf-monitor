@@ -1,6 +1,7 @@
 import logging
 import os
 import sys
+import time
 from datetime import datetime
 from typing import Any, Callable, List, Optional
 
@@ -38,6 +39,17 @@ def pytest_collection_modifyitems(session: pytest.Session, config: pytest.Config
         filtered_items,
         key=lambda x: (os.path.dirname(x.path), get_param(x, 'config', DEFAULT_SDKCONFIG))
     )
+
+
+@pytest.fixture(scope='session')
+def coverage_run():
+    """Run with coverage reporting if set by environment variable"""
+    if 'COVERAGE_PROCESS_START' in os.environ:
+        yield ['coverage', 'run', '--parallel-mode']
+        # wait for coverage to write the data
+        time.sleep(1)
+    else:
+        yield [sys.executable]
 
 
 @pytest.fixture(scope='session', autouse=True)

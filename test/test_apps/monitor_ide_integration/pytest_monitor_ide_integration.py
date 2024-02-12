@@ -1,11 +1,12 @@
 # SPDX-FileCopyrightText: 2022-2023 Espressif Systems (Shanghai) CO LTD
 # SPDX-License-Identifier: Unlicense OR CC0-1.0
+import itertools
 import json
 import logging
 import multiprocessing
 import os
 import re
-import sys
+from typing import List
 
 import pexpect
 import pytest
@@ -74,13 +75,15 @@ def webSocketServer():
 @pytest.mark.esp32
 @pytest.mark.generic
 @pytest.mark.parametrize('config', ['gdb_stub', 'coredump'], indirect=True)
-def test_monitor_ide_integration(config: str, dut: Dut, webSocketServer: WebSocketServer) -> None:
+def test_monitor_ide_integration(config: str, coverage_run: List[str], dut: Dut, webSocketServer: WebSocketServer) -> None:
     # The port needs to be closed because esp_idf_monitor will connect to it
-    dut.serial.stop_redirect_thread()
+    dut.serial.close()
 
-    monitor_cmd = ' '.join([sys.executable, '-m', 'esp_idf_monitor', os.path.join(dut.app.binary_path, 'panic.elf'),
-                            '--port', str(dut.serial.port),
-                            '--ws', f'ws://{webSocketServer.HOST}:{webSocketServer.port.value}'])
+    monitor_cmd = ' '.join(itertools.chain(
+        coverage_run,
+        ['-m', 'esp_idf_monitor', os.path.join(dut.app.binary_path, 'panic.elf'), '--port', str(dut.serial.port),
+         '--ws', f'ws://{webSocketServer.HOST}:{webSocketServer.port.value}']
+    ))
     monitor_log_path = os.path.join(dut.logdir, 'monitor.txt')
 
     with open(monitor_log_path, 'w') as log, pexpect.spawn(monitor_cmd,
@@ -95,3 +98,6 @@ def test_monitor_ide_integration(config: str, dut: Dut, webSocketServer: WebSock
         p.expect_exact('Waiting for debug finished event')
         p.expect(re.compile(r"WebSocket received: \{'event': 'debug_finished'\}"))
         p.expect_exact('Communications through WebSocket is finished')
+        # end monitor and wait for proper termination to ensure complete coverage report
+        p.sendcontrol(']')
+        p.expect_exact(pexpect.EOF)
