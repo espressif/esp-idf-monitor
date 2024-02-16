@@ -115,7 +115,7 @@ class Reset:
         self._setRTS(HIGH)  # EN=HIGH, chip out of reset
 
     def to_bootloader(self) -> None:
-        """Reset chip into booloader"""
+        """Reset chip into bootloader"""
         if self.custom_seq:
             # use custom reset sequence set in config file
             source = 'from esptool ' if self.esptool_config else ''

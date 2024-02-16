@@ -30,6 +30,13 @@ repos:
     hooks:
     -   id: mypy
 
+  - repo: https://github.com/codespell-project/codespell
+    rev: v2.2.5
+    hooks:
+    - id: codespell
+      additional_dependencies:
+        - tomli
+
   - repo: https://github.com/espressif/conventional-precommit-linter
     rev: v1.2.1
     hooks:

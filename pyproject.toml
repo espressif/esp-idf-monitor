@@ -106,3 +106,7 @@ perf = "Performance Improvements"
 [tool.coverage.run]
 parallel = true
 source = ["../esp_idf_monitor/"]
+
+[tool.codespell]
+write-changes = true
+skip = 'test/host_test/inputs/*'

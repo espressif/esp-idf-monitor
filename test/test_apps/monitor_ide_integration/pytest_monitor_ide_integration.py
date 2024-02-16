@@ -52,7 +52,7 @@ class WebSocketServer(object):
         server.close()
 
     def __init__(self) -> None:
-        # create a shared interger ('i') with a default value 0
+        # create a shared integer ('i') with a default value 0
         self.port = multiprocessing.Value('i', 0)
         self.exit_event = multiprocessing.Event()
         self.proc = multiprocessing.Process(target=self.run, args=(self.port,))
