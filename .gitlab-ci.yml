@@ -65,8 +65,6 @@ workflow:
 
 .build_template:
   stage: build
-  needs:
-    - pre-commit_hooks_MR
   tags:
     - build
   variables:
@@ -152,13 +150,27 @@ build_idf_v5.1:
 # ------------------------------------------------------------------------------------------------------
 
 # CODE CHECK BY PRE-COMMIT HOOKS
-pre-commit_hooks_MR:
-  extends: .base_template
+pre-commit-mr:
   stage: pre-check
+  needs: []
+  image: python:3.11-alpine3.18
+  before_script:
+    - apk add git
+    - pip install pre-commit
   script:
-    - apt-get update && apt-get install -y -q git
-    - git diff-tree --no-commit-id --name-only -r $CI_COMMIT_SHA | xargs pre-commit run --files
-
+    - echo "Merge request is from ${CI_COMMIT_REF_NAME} into ${CI_MERGE_REQUEST_TARGET_BRANCH_NAME}"
+    - git fetch origin ${CI_MERGE_REQUEST_TARGET_BRANCH_NAME} ${CI_COMMIT_REF_NAME}
+    - export from_sha=$(git merge-base HEAD origin/${CI_MERGE_REQUEST_TARGET_BRANCH_NAME})
+    - echo "Checking changes from ${from_sha} to ${CI_COMMIT_SHA}:"
+    - git log --oneline ${from_sha}..${CI_COMMIT_SHA}
+    - echo "Modified files:"
+    - git diff-tree --no-commit-id --name-only -r ${from_sha} ${CI_COMMIT_SHA}
+    - echo "Running pre-commit:"
+    - pre-commit run --from ${from_sha} --to ${CI_COMMIT_SHA}
+  rules:
+    - if: '$CI_PIPELINE_SOURCE == "merge_request_event"'
+  tags:
+    - build
 # ------------------------------------------------------------------------------------------------------
 
 # TESTS
@@ -167,8 +179,6 @@ pre-commit_hooks_MR:
 test_idf_monitor:
   extends: .idf_template
   stage: host_test
-  needs:
-    - pre-commit_hooks_MR
   artifacts:
     # save artifacts always in order to access results which were retried without consequent failure
     when: always
