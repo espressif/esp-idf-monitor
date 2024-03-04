@@ -194,6 +194,28 @@ test_idf_monitor:
     - cd ${TEST_DIR}
     - coverage run -m pytest -sv host_test/test_monitor.py
 
+windows_test:
+  stage: host_test
+  tags:
+    - windows-build
+  artifacts:
+    # save artifacts always in order to access results which were retried without consequent failure
+    when: always
+    paths:
+      - test/host_test/outputs/*
+      - "**/.coverage*"
+      - ".coverage*"
+    expire_in: 1 week
+  variables:
+    PYTHONPATH: "${CI_PROJECT_DIR}\\test"
+    COVERAGE_PROCESS_START: "${CI_PROJECT_DIR}\\pyproject.toml"
+  before_script:
+    - python -m pip install --upgrade pip
+    - pip install -e .[dev,host_test] --prefer-binary
+  script:
+    - cd ${TEST_DIR}\host_test
+    - coverage run -m pytest -sv test_monitor.py
+
 .before_script_pytest_jobs:
   before_script:
     - pip install -e .[dev,target_test] --prefer-binary

@@ -1,5 +1,5 @@
 [build-system]
-requires = ["setuptools>=61.2"]
+requires = ["setuptools>=64"]
 build-backend = "setuptools.build_meta"
 
 [project]
@@ -105,7 +105,10 @@ perf = "Performance Improvements"
 
 [tool.coverage.run]
 parallel = true
-source = ["../esp_idf_monitor/"]
+source = ["../esp_idf_monitor/", "../../esp_idf_monitor/", "esp_idf_monitor/"]
+[tool.coverage.paths]
+# following paths will be considered as equivalent to maintain multiplatform compatibility
+source = ["./esp_idf_monitor/", "*/esp_idf_monitor/"]
 
 [tool.codespell]
 write-changes = true

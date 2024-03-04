@@ -1,22 +1,25 @@
 #!/usr/bin/env python
 #
-# SPDX-FileCopyrightText: 2018-2023 Espressif Systems (Shanghai) CO LTD
+# SPDX-FileCopyrightText: 2018-2024 Espressif Systems (Shanghai) CO LTD
 # SPDX-License-Identifier: Apache-2.0
 import errno
 import filecmp
 import os
-import pty
 import re
 import socket
 import subprocess
 import sys
 import threading
 import time
+from tempfile import NamedTemporaryFile
 from typing import Dict, List, Optional, Tuple
 
 import pytest
 
 from .conftest import out_dir
+
+if os.name != 'nt':
+    import pty
 
 HOST = 'localhost'
 
@@ -39,16 +42,27 @@ def on_timeout(process):
             raise
 
 
+def filename_fix(input: str) -> str:
+    """Remove invalid characters from filename on Windows"""
+    if os.name == 'nt':
+        regex = re.compile(r'[\\/:*?\"<>|]')
+        return regex.sub('', input)
+    return input
+
+
 class TestBaseClass:
     """Base class to define shared fixtures and methods"""
 
-    master_fd : int
+    master_fd : Optional[int]
+    slave_fd : Optional[int]
     proc : subprocess.Popen
 
     def send_control(self, sequence: str):
         """Send a control sequence to monitor STDIN
         Note: Monitor needs to be running in async mode with 'ignore_input' set to False
         """
+        if self.master_fd is None:
+            raise ValueError('Master FD is not set')
         byte = b''
         for c in sequence:
             # convert letter to control code
@@ -83,13 +97,16 @@ class TestBaseClass:
         if ignore_input:
             # enable closing the monitor from a socket and disable reading the input
             env['ESP_IDF_MONITOR_TEST'] = '1'
-        output_file = os.path.join(out_dir, self.test_name)
-        # stdin needs to be connected to some pseudo-tty in docker image even when it is not used at all
-        self.master_fd, self.slave_fd = pty.openpty()
+        output_file = os.path.join(out_dir, filename_fix(self.test_name))
+        if os.name == 'nt':
+            self.master_fd, self.slave_fd = None, None
+        else:
+            # stdin needs to be connected to some pseudo-tty in docker image even when it is not used at all
+            self.master_fd, self.slave_fd = pty.openpty()
         with open(f'{output_file}.out', 'w') as o_f, open(f'{output_file}.err', 'w') as e_f:
             self.proc = subprocess.Popen(cmd, env=env, stdin=self.slave_fd, stdout=o_f, stderr=e_f)
         # make sure monitor is running before sending data
-        time.sleep(1)
+        time.sleep(3 if os.name == 'nt' else 1)
         return f'{output_file}.out', f'{output_file}.err'
 
     def run_monitor(self, args: List[str], input_file: str, custom_port: str = '', timeout: int = 60) -> Tuple[str, str]:
@@ -101,6 +118,9 @@ class TestBaseClass:
         monitor_watchdog = threading.Timer(timeout, on_timeout, [self.proc])
         monitor_watchdog.start()
 
+        # make sure that monitor is running, else we will end in an infinite loop
+        if self.proc.poll() is not None:
+            pytest.fail('Monitor has already ended')
         # send input file content to socket
         clientsocket, _ = self.serversocket.accept()
         try:
@@ -121,13 +141,29 @@ class TestBaseClass:
             clientsocket.close()
         return out, err
 
+    def filecmp(self, file: str, expected_out: str) -> bool:
+        """Compare two files, remove escape sequences from expected_out on Windows"""
+        print(f'Comparing {file} with {expected_out}')
+        try:
+            if os.name == 'nt':
+                # remove escape sequences form the file and create a new temp file
+                ansi_regex = re.compile(r'\x1B\[\d+(;\d+){0,2}m')
+                with NamedTemporaryFile(dir=IN_DIR, delete=False, mode='w+') as converted, open(os.path.join(IN_DIR, expected_out), 'r') as input:
+                    converted.writelines(ansi_regex.sub('', input.read()))
+                    expected_out = converted.name
+            return filecmp.cmp(file, os.path.join(IN_DIR, expected_out), shallow=False)
+        finally:
+            if os.name == 'nt':
+                os.unlink(expected_out)
+
     def teardown_method(self):
         """Class teardown method to cleanup pseudo-tty used for STDIN"""
-        try:
-            os.close(self.slave_fd)
-            os.close(self.master_fd)
-        except Exception:
-            pass
+        if os.name != 'nt':
+            try:
+                os.close(self.slave_fd)
+                os.close(self.master_fd)
+            except Exception:
+                pass
 
     @pytest.fixture(scope='module', autouse=True)
     def output_dir(self):
@@ -184,10 +220,14 @@ class TestHost(TestBaseClass):
     @pytest.mark.flaky(reruns=2)
     def test_print_filter(self, input_file: str, filter: str, expected_out: str, timeout: int):
         """Test monitor filtering feature"""
-        args = ['--port', f'socket://{HOST}:{self.port}?logging=debug', '--print_filter', filter]
-        out, _ = self.run_monitor(args, input_file, timeout=timeout)
-        assert filecmp.cmp(out, os.path.join(IN_DIR, expected_out), shallow=False)
+        args = ['--print_filter', filter]
+        out, err = self.run_monitor(args, input_file, timeout=timeout)
+        with open(err, 'r') as f_err:
+            stderr = f_err.read()
+            assert 'Stopping condition has been received' in stderr
+        assert self.filecmp(out, expected_out)
 
+    @pytest.mark.skipif(os.name == 'nt', reason='Linux/MacOS only')
     def test_rfc2217(self, rfc2217: str):
         """Run monitor with RFC2217 port"""
         # run with no reset because it is not supported for socker ports
@@ -200,9 +240,10 @@ class TestHost(TestBaseClass):
         assert regex.search(stderr) is not None
         assert 'Exception' not in stderr
         assert 'Stopping condition has been received' in stderr
-        assert filecmp.cmp(out, os.path.join(IN_DIR, 'in1f1.txt'), shallow=False)
+        assert self.filecmp(out, 'in1f1.txt')
 
 
+@pytest.mark.skipif(os.name == 'nt', reason='Linux/MacOS only')
 class TestConfig(TestBaseClass):
 
     def create_config(self, options: Dict[str, str], section='esp-idf-monitor', filename: str = 'config.cfg'):
