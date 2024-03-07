@@ -192,8 +192,7 @@ test_idf_monitor:
     COVERAGE_PROCESS_START: "${CI_PROJECT_DIR}/pyproject.toml"
   script:
     - cd ${TEST_DIR}
-    # don't use the configuration file
-    - coverage run -m pytest -sv -c /dev/null host_test/test_monitor.py
+    - coverage run -m pytest -sv host_test/test_monitor.py
 
 .before_script_pytest_jobs:
   before_script:
@@ -225,7 +224,7 @@ test_idf_monitor:
     when: always
     expire_in: 1 week
   script:
-    - cd ${TEST_DIR}
+    - cd ${TEST_DIR}/test_apps
     - IDF_VERSION=$(echo $IDF_BRANCH | tr / _)
     - pytest --junit-xml=${TEST_DIR}/results_${IDF_TARGET}_${IDF_VERSION}.xml --target=${IDF_TARGET}
 
@@ -241,7 +240,6 @@ test_target_apps:
     matrix:
       - IDF_BRANCH: ["release/v5.1", "release/v5.2", "master"]
         IDF_TARGET: ["esp32"]
-
 
 test_linux_apps:
   extends:
@@ -269,6 +267,7 @@ test_linux_apps:
       --parallel-index ${CI_NODE_INDEX:-1}
     - IDF_VERSION=$(echo $IDF_BRANCH | tr / _)
     # setting path before running build will break the build process
+    - cd test_apps
     - PYTHONPATH=$PYTHONPATH:${TEST_DIR}
     - pytest --junit-xml=${TEST_DIR}/results_${IDF_TARGET}_${IDF_VERSION}.xml --target=linux
 
