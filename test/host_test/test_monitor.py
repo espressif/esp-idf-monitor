@@ -2,6 +2,7 @@
 #
 # SPDX-FileCopyrightText: 2018-2024 Espressif Systems (Shanghai) CO LTD
 # SPDX-License-Identifier: Apache-2.0
+import datetime
 import errno
 import filecmp
 import os
@@ -242,6 +243,63 @@ class TestHost(TestBaseClass):
         assert 'Stopping condition has been received' in stderr
         assert self.filecmp(out, 'in1f1.txt')
 
+    @pytest.mark.skipif(os.name == 'nt', reason='Linux/MacOS only')
+    def test_upload_commands(self):
+        """Run monitor with make flash and make flash-app commands"""
+        # run monitor on empty input
+        out, err = self.run_monitor_async()
+        self.send_control('TJ')  # unknown command
+        self.send_control('TA')  # make app-flash
+        time.sleep(1)  # wait for make to run
+        self.send_control('T')  # press any key to reset
+        self.send_control('TF')  # make flash
+        time.sleep(1)  # wait for make to run
+        self.send_control('TX')
+        assert self.close_monitor_async() == 0
+
+        with open(err, 'r') as f_err:
+            stderr = f_err.read()
+        assert 'Running make app-flash...' in stderr  # Triggered by TA
+        assert 'Running make flash...' in stderr  # TF
+        assert '--- unknown menu character Ctrl+J --' in stderr  # TJ
+
+    @pytest.mark.skipif(os.name == 'nt', reason='Linux/MacOS only')
+    def test_log(self):
+        """Run monitor with logging enabled including the timestamps"""
+        # run monitor on empty input
+        out, err = self.run_monitor_async()
+        monitor_watchdog = threading.Timer(60, on_timeout, [self.proc])
+        monitor_watchdog.start()
+        self.send_control('TL')  # toggle log file
+        self.send_control('TI')  # toggle timestamps
+        time.sleep(1)  # wait for commands to apply
+        clientsocket, _ = self.serversocket.accept()
+        input_file = 'in1.txt'
+        try:
+            with open(os.path.join(IN_DIR, input_file), 'rb') as f:
+                for chunk in iter(lambda: f.read(1024), b''):
+                    clientsocket.sendall(chunk)
+            time.sleep(1)
+            self.send_control('TL')  # close log file to make sure that output is written
+            time.sleep(1)  # wait for command to apply
+            assert self.close_monitor_async() == 0
+            monitor_watchdog.cancel()
+        finally:
+            clientsocket.close()
+        with open(err, 'r') as f_err:
+            stderr = f_err.read()
+        with open(out, 'r') as f_out:
+            stdout = f_out.read()
+        # check that timestamps are enabled
+        date = datetime.datetime.now().strftime('%Y-%m-%d')
+        assert date in stdout
+        # make sure that logging was enabled
+        regex = re.compile('Logging is enabled into file (.*\\.txt)')
+        # compare log file with the output
+        log_file = regex.search(stderr)
+        assert log_file is not None
+        self.filecmp(log_file.groups()[0], out_dir)
+
 
 @pytest.mark.skipif(os.name == 'nt', reason='Linux/MacOS only')
 class TestConfig(TestBaseClass):
@@ -292,6 +350,23 @@ class TestConfig(TestBaseClass):
         assert log_file is not None
         # make sure that log file was closed on monitor exit
         assert f'Logging is disabled and file {log_file.groups()[0]} has been closed' in stderr
+
+    def test_skip_menu(self):
+        """Run monitor with custom config to skip menu key"""
+        # create custom config to skip menu
+        self.create_config({'skip_menu_key': 'True'})
+        # run monitor on empty input
+        _, err = self.run_monitor_async()
+        self.send_control('TH')  # show help command
+        self.send_control('A')  # make app-flash (missing menu key)
+        time.sleep(1)  # wait for make to run
+        assert self.close_monitor_async() == 0
+
+        with open(err, 'r') as f_err:
+            stderr = f_err.read()
+        # make sure that menu was skipped
+        assert '--- Using the "skip_menu_key" option from a config file.' in stderr
+        assert 'Running make app-flash...' in stderr  # Triggered by A
 
     def test_invalid_custom_config(self):
         # create custom config with unsupported value and unknown key

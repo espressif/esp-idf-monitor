@@ -101,3 +101,39 @@ def test_monitor_ide_integration(config: str, coverage_run: List[str], dut: Dut,
         # end monitor and wait for proper termination to ensure complete coverage report
         p.sendcontrol(']')
         p.expect_exact(pexpect.EOF)
+
+
+@pytest.mark.esp32
+@pytest.mark.generic
+@pytest.mark.parametrize('config', ['gdb_stub', 'coredump'], indirect=True)
+def test_monitor_decode(config: str, coverage_run: List[str], dut: Dut) -> None:
+    # The port needs to be closed because esp_idf_monitor will connect to it
+    dut.serial.close()
+
+    monitor_cmd = ' '.join(itertools.chain(
+        coverage_run,
+        ['-m', 'esp_idf_monitor', os.path.join(dut.app.binary_path, 'panic.elf'), '--port', str(dut.serial.port)]
+    ))
+    monitor_log_path = os.path.join(dut.logdir, 'monitor.txt')
+
+    with open(monitor_log_path, 'w') as log, pexpect.spawn(monitor_cmd,
+                                                           logfile=log,
+                                                           timeout=5,
+                                                           encoding='utf-8',
+                                                           codec_errors='ignore') as p:
+        p.expect(re.compile(r'Guru Meditation Error'), timeout=10)
+        if config == 'gdb_stub':
+            p.expect_exact('Entering gdb stub now.')
+            p.expect_exact('$T0b#e6')
+            p.expect_exact('(gdb)')
+            p.sendline('quit')
+            p.expect_exact('Quit anyway? (y or n)')
+            p.sendline('y')
+        else:
+            p.expect_exact('Core dump started (further output muted)')
+            p.expect_exact('Core dump finished!')
+            p.expect_exact('==================== ESP32 CORE DUMP START ====================')
+            p.expect_exact('===================== ESP32 CORE DUMP END =====================')
+        # end monitor and wait for proper termination to ensure complete coverage report
+        p.sendcontrol(']')
+        p.expect_exact(pexpect.EOF)
