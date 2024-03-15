@@ -1,10 +1,17 @@
 # SPDX-FileCopyrightText: 2023 Espressif Systems (Shanghai) CO LTD
 # SPDX-License-Identifier: Apache-2.0
+import os
+
 out_dir = ''
 
 
 def pytest_addoption(parser):
-    parser.addoption('--output', action='store', default='./outputs/', help='Output directory for writing STDOUT and STDERR from tests')
+    parser.addoption(
+        '--output',
+        action='store',
+        default=os.path.join(os.path.abspath(os.path.dirname(__file__)), 'outputs'),
+        help='Output directory for writing STDOUT and STDERR from tests'
+    )
 
 
 def pytest_configure(config):

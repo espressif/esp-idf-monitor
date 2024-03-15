@@ -51,7 +51,7 @@ class ConsoleReader(StoppableThread):
         try:
             while self.alive:
                 try:
-                    if os.name == 'nt':
+                    if os.name == 'nt' and not self.test_mode:
                         # Windows kludge: because the console.cancel() method doesn't
                         # seem to work to unblock getkey() on the Windows implementation.
                         #
