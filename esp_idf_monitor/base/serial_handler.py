@@ -121,7 +121,7 @@ class SerialHandler:
                     decoded_line = line_strip.decode(errors='ignore')
                     self.decode_error_cnt += 1
                     if self.decode_error_cnt >= 3:
-                        yellow_print('Multiple decode errors occurred: Try checking the baud rate and XTAL frequency setting in menuconfig')
+                        yellow_print('Failed to decode multiple lines in a row. Try checking the baud rate and XTAL frequency setting in menuconfig')
                         self.decode_error_cnt = 0
                 if self._force_line_print or line_matcher.match(decoded_line):
                     self.logger.print(line)
