@@ -1,0 +1,10 @@
+V (30) verbose: this is a verbose message
+D (120) debug: Debug message
+I (578) main_task: Started on CPU0
+W (470) spi_flash: Detected size(4096k)
+E (623) foo: This is an example error
+Hello world!
+Already colored
+[0;32mI (578) main_task: Started on CPU0[0m
+[0;33mW (470) spi_flash: Detected size(4096k)[0m
+[1;31mE (623) foo: This is an example error[0m

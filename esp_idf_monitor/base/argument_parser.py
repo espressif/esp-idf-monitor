@@ -133,4 +133,10 @@ def get_parser():  # type: () -> argparse.ArgumentParser
         default=False,
         action='store_true')
 
+    parser.add_argument(
+        '--disable-auto-color',
+        help='Disable automatic color addition to monitor output based on the log level',
+        default=False,
+        action='store_true')
+
     return parser
