@@ -39,4 +39,4 @@ This repository utilizes an automatic [spell checker](https://github.com/codespe
 
 ## License
 
-This document and the attached source code are released as Free Software under Apache License Version 2 or later. See the accompanying [LICENSE file](https://github.com/espressif/esp-idf-monitor/blob/master/LICENSE) for a copy.
+This document and the attached source code are released as Free Software under Apache License Version 2. See the accompanying [LICENSE file](https://github.com/espressif/esp-idf-monitor/blob/master/LICENSE) for a copy.
