@@ -100,6 +100,7 @@ class Monitor:
         timestamps=False,  # type: bool
         timestamp_format='',  # type: str
         force_color=False,  # type: bool
+        disable_auto_color=False,  # type: bool
         rom_elf_file=None,  # type: Optional[str]
     ):
         self.event_queue = queue.Queue()  # type: queue.Queue
@@ -142,7 +143,7 @@ class Monitor:
 
         cls = SerialHandler if self.elf_exists else SerialHandlerNoElf
         self.serial_handler = cls(b'', socket_test_mode, self.logger, decode_panic, PANIC_IDLE, b'', target,
-                                  False, False, self.serial, encrypted, self.elf_file, toolchain_prefix)
+                                  False, False, self.serial, encrypted, self.elf_file, toolchain_prefix, disable_auto_color)
 
         self.console_parser = ConsoleParser(eol)
         self.console_reader = ConsoleReader(self.console, self.event_queue, self.cmd_queue, self.console_parser,
@@ -417,6 +418,7 @@ def main() -> None:
                       args.timestamps,
                       args.timestamp_format,
                       args.force_color,
+                      args.disable_auto_color,
                       rom_elf_file)
 
         yellow_print('--- Quit: {q} | Menu: {m} | Help: {m} followed by {h} ---'.format(

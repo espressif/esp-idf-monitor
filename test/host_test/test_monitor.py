@@ -228,6 +228,42 @@ class TestHost(TestBaseClass):
             assert 'Stopping condition has been received' in stderr
         assert self.filecmp(out, expected_out)
 
+    def test_auto_color(self):
+        """Test monitor auto-coloring feature"""
+        # run monitor on empty input
+        out, err = self.run_monitor([], 'color.txt')
+        with open(err, 'r') as f_err:
+            stderr = f_err.read()
+            assert 'Stopping condition has been received' in stderr
+        assert self.filecmp(out, 'color_out.txt')
+
+    @pytest.mark.skipif(os.name == 'nt', reason='Linux/MacOS only')
+    def test_auto_color_advanced(self):
+        """Test monitor auto-coloring feature with mixed line endings and delay in the middle of line"""
+        # run monitor on empty input
+        out, err = self.run_monitor_async()
+        clientsocket, _ = self.serversocket.accept()
+        try:
+            clientsocket.send(b'I (1234) start of the line, ')
+            time.sleep(1)  # wait for message to be processed
+            clientsocket.send(b'continue on the next line\n')
+            clientsocket.send(b'W (1234) mixed line endings\r\n')
+            time.sleep(0.5)
+            self.send_control('TI')  # toggle timestamps
+            clientsocket.send(b'E (1234) error log with a timestamp\n')
+            time.sleep(1)  # wait for messages to be processed
+            self.send_control(']')  # close monitor
+            time.sleep(1)
+            assert self.close_monitor_async() == 0
+        finally:
+            clientsocket.close()
+        with open(out, 'r') as f_out:
+            output = f_out.read()
+        assert '\033[0;32mI (1234) start of the line, continue on the next line\033[0m\n' in output
+        assert '\033[0;33mW (1234) mixed line endings\033[0m\n' in output
+        regex = re.compile(r'\d{4}-\d{2}-\d{2} \d{2}:\d{2}:\d{2} \033\[1;31mE \(1234\) error log with a timestamp\033\[0m\n')
+        assert regex.search(output) is not None
+
     @pytest.mark.skipif(os.name == 'nt', reason='Linux/MacOS only')
     def test_rfc2217(self, rfc2217: str):
         """Run monitor with RFC2217 port"""
