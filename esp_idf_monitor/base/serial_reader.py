@@ -1,4 +1,4 @@
-# SPDX-FileCopyrightText: 2015-2021 Espressif Systems (Shanghai) CO LTD
+# SPDX-FileCopyrightText: 2015-2024 Espressif Systems (Shanghai) CO LTD
 # SPDX-License-Identifier: Apache-2.0
 
 import queue  # noqa: F401
@@ -25,14 +25,15 @@ class SerialReader(Reader):
     event queue, until stopped.
     """
 
-    def __init__(self, serial_instance, event_queue, reset, target):
-        #  type: (serial.Serial, queue.Queue, bool, str) -> None
+    def __init__(self, serial_instance, event_queue, reset, open_port_attempts, target):
+        #  type: (serial.Serial, queue.Queue, bool, int, str) -> None
         super(SerialReader, self).__init__()
         self.baud = serial_instance.baudrate
         self.serial = serial_instance
         self.event_queue = event_queue
         self.gdb_exit = False
         self.reset = reset
+        self.open_port_attempts = open_port_attempts
         self.reset_strategy = Reset(serial_instance, target)
         if not hasattr(self.serial, 'cancel_read'):
             # enable timeout for checking alive flag,
@@ -46,40 +47,51 @@ class SerialReader(Reader):
             try:
                 # We can come to this thread at startup or from external application line GDB.
                 # If we come from GDB we would like to continue to run without reset.
-                self.open_serial(reset=not self.gdb_exit and self.reset)
+                self.reset = not self.gdb_exit and self.reset
+                self.open_serial(reset=self.reset)
+                # Successfully connected, so any further reconnections should occur without a reset.
+                self.reset = False
             except serial.SerialException as e:
                 print(e)
-                # if connection to port fails suggest other available ports
-                port_list = '\n'.join(
-                    [
-                        p.device
-                        for p in list_ports.comports()
-                        if not p.device.endswith(FILTERED_PORTS)
-                    ]
-                )
-                yellow_print(f'Connection to {self.serial.portstr} failed. Available ports:\n{port_list}')
-                return
+                if self.open_port_attempts == 1:
+                    # If the connection to the port fails and --open-port-attempts was not specified,
+                    # recommend other available ports and exit.
+                    port_list = '\n'.join(
+                        [
+                            p.device
+                            for p in list_ports.comports()
+                            if not p.device.endswith(FILTERED_PORTS)
+                        ]
+                    )
+                    yellow_print(f'Connection to {self.serial.portstr} failed. Available ports:\n{port_list}')
+                    return
             self.gdb_exit = False
         try:
             while self.alive:
                 try:
-                    data = self.serial.read(self.serial.in_waiting or 1)
-                except (serial.SerialException, IOError) as e:
+                    if self.serial.is_open:
+                        # in_waiting assumes the port is already open
+                        data = self.serial.read(self.serial.in_waiting or 1)
+                    else:
+                        raise serial.PortNotOpenError
+                except (serial.SerialException, IOError, OSError) as e:
                     data = b''
                     # self.serial.open() was successful before, therefore, this is an issue related to
                     # the disappearance of the device
-                    red_print(e.strerror)
+                    red_print(str(e))
                     yellow_print('Waiting for the device to reconnect', newline='')
                     self.close_serial()
                     while self.alive:  # so that exiting monitor works while waiting
                         try:
                             time.sleep(RECONNECT_DELAY)
                             # reset on reconnect can be unexpected for wakeup from deepsleep using JTAG
-                            self.open_serial(reset=False)
+                            self.open_serial(reset=self.reset)
+                            self.reset = False
                             break  # device connected
-                        except serial.SerialException:
+                        except (serial.SerialException, IOError, OSError):
                             yellow_print('.', newline='')
                             sys.stderr.flush()
+
                     yellow_print('')  # go to new line
                 if data:
                     self.event_queue.put((TAG_SERIAL, data), False)

@@ -1,4 +1,4 @@
-# SPDX-FileCopyrightText: 2023 Espressif Systems (Shanghai) CO LTD,
+# SPDX-FileCopyrightText: 2023-2024 Espressif Systems (Shanghai) CO LTD,
 # other contributors as noted.
 #
 # SPDX-License-Identifier: Apache-2.0
@@ -20,6 +20,7 @@ VALID_OPTIONS = [
     'chip_reset_bootloader_key',
     'exit_menu_key',
     'skip_menu_key',
+    'reconnect_delay',
     'custom_reset_sequence',  # from esptool config
 ]
 
