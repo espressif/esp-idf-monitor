@@ -90,6 +90,7 @@ class Monitor:
         make='make',  # type: str
         encrypted=False,  # type: bool
         reset=DEFAULT_TARGET_RESET,  # type: bool
+        retry_open=False,  # type: bool
         toolchain_prefix=DEFAULT_TOOLCHAIN_PREFIX,  # type: str
         eol='CRLF',  # type: str
         decode_coredumps=COREDUMP_DECODE_INFO,  # type: str
@@ -128,7 +129,7 @@ class Monitor:
             # testing hook: when running tests, input from console is ignored
             socket_test_mode = os.environ.get('ESP_IDF_MONITOR_TEST') == '1'
             self.serial = serial_instance
-            self.serial_reader = SerialReader(self.serial, self.event_queue, reset, target)  # type: Reader
+            self.serial_reader = SerialReader(self.serial, self.event_queue, reset, retry_open, target)  # type: Reader
 
             self.gdb_helper = GDBHelper(toolchain_prefix, websocket_client, self.elf_file, self.serial.port,
                                         self.serial.baudrate) if self.elf_exists else None
@@ -414,6 +415,7 @@ def main() -> None:
                       args.make,
                       args.encrypted,
                       not args.no_reset,
+                      args.retry_open,
                       args.toolchain_prefix,
                       args.eol,
                       args.decode_coredumps,

@@ -55,7 +55,7 @@ GDB_EXIT_TIMEOUT = 0.3  # time delay between exit and writing GDB_UART_CONTINUE_
 LAST_LINE_THREAD_INTERVAL = 0.1
 
 MINIMAL_EN_LOW_DELAY = 0.005
-RECONNECT_DELAY = 0.5  # timeout between reconnect tries
+RECONNECT_DELAY = 0.1  # timeout between reconnect tries
 CHECK_ALIVE_FLAG_TIMEOUT = 0.25  # timeout for checking alive flags (currently used by serial reader)
 
 # closing wait timeout for serial port

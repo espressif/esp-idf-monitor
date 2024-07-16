@@ -139,4 +139,10 @@ def get_parser():  # type: () -> argparse.ArgumentParser
         default=False,
         action='store_true')
 
+    parser.add_argument(
+        '--retry-open',
+        help='Indefinitely retry opening the port device for the first time',
+        default=False,
+        action='store_true')
+
     return parser
