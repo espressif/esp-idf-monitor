@@ -44,7 +44,6 @@ from esp_idf_monitor.base.constants import (CTRL_C, CTRL_H,
                                             DEFAULT_TARGET_RESET,
                                             DEFAULT_TOOLCHAIN_PREFIX,
                                             ESPPORT_ENVIRON,
-                                            ESPTOOL_RETRY_OPEN_SERIAL_ENVIRON,
                                             EVENT_QUEUE_TIMEOUT,
                                             GDB_EXIT_TIMEOUT,
                                             GDB_UART_CONTINUE_COMMAND,
@@ -399,8 +398,7 @@ def main() -> None:
             # has a check for this).
             # To make sure the key as well as the value are str type, by the requirements of subprocess
             espport_val = str(args.port)
-            retryopen_val = str(args.retry_open)
-            os.environ.update({ESPPORT_ENVIRON: espport_val, ESPTOOL_RETRY_OPEN_SERIAL_ENVIRON: retryopen_val})
+            os.environ.update({ESPPORT_ENVIRON: espport_val})
 
             cls = SerialMonitor
             yellow_print('--- esp-idf-monitor {v} on {p.name} {p.baudrate} ---'.format(v=__version__, p=serial_instance))
