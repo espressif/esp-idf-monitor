@@ -45,7 +45,7 @@ from esp_idf_monitor.base.constants import (CTRL_C, CTRL_H,
                                             DEFAULT_TOOLCHAIN_PREFIX,
                                             ESPPORT_ENVIRON,
                                             EVENT_QUEUE_TIMEOUT,
-                                            GDB_EXIT_TIMEOUT,
+                                            FILTERED_PORTS, GDB_EXIT_TIMEOUT,
                                             GDB_UART_CONTINUE_COMMAND,
                                             LAST_LINE_THREAD_INTERVAL,
                                             MAKEFLAGS_ENVIRON,
@@ -314,6 +314,12 @@ def detect_port() -> Union[str, NoReturn]:
     """Detect connected ports and return the last one"""
     try:
         port_list = list_ports.comports()
+        if sys.platform == 'darwin':
+            port_list = [
+                port
+                for port in port_list
+                if not port.device.endswith(FILTERED_PORTS)
+            ]
         port: str = port_list[-1].device
         # keep the `/dev/ttyUSB0` default port on linux if connected
         # TODO: This can be removed in next major release

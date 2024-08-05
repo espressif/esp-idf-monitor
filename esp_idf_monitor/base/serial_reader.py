@@ -10,7 +10,7 @@ import serial
 from serial.tools import list_ports
 
 from .constants import (ASYNC_CLOSING_WAIT_NONE, CHECK_ALIVE_FLAG_TIMEOUT,
-                        HIGH, LOW, RECONNECT_DELAY, TAG_SERIAL)
+                        FILTERED_PORTS, HIGH, LOW, RECONNECT_DELAY, TAG_SERIAL)
 from .output_helpers import red_print, yellow_print
 from .reset import Reset
 from .stoppable_thread import StoppableThread
@@ -50,7 +50,13 @@ class SerialReader(Reader):
             except serial.SerialException as e:
                 print(e)
                 # if connection to port fails suggest other available ports
-                port_list = '\n'.join([p.device for p in list_ports.comports()])
+                port_list = '\n'.join(
+                    [
+                        p.device
+                        for p in list_ports.comports()
+                        if not p.endswith(FILTERED_PORTS)
+                    ]
+                )
                 yellow_print(f'Connection to {self.serial.portstr} failed. Available ports:\n{port_list}')
                 return
             self.gdb_exit = False

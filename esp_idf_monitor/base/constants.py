@@ -67,3 +67,6 @@ USB_JTAG_SERIAL_PID = 0x1001
 # DTR and RTS pin settings
 LOW = True
 HIGH = False
+
+# Port names to filter out
+FILTERED_PORTS = ('Bluetooth-Incoming-Port', 'wlan-debug')
