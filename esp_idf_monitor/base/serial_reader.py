@@ -54,7 +54,7 @@ class SerialReader(Reader):
                     [
                         p.device
                         for p in list_ports.comports()
-                        if not p.endswith(FILTERED_PORTS)
+                        if not p.device.endswith(FILTERED_PORTS)
                     ]
                 )
                 yellow_print(f'Connection to {self.serial.portstr} failed. Available ports:\n{port_list}')
