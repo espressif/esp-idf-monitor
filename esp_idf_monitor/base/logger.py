@@ -3,7 +3,7 @@
 
 import datetime
 import os
-from typing import AnyStr, BinaryIO, Callable, Optional  # noqa: F401
+from typing import AnyStr, BinaryIO, Callable, List, Optional  # noqa: F401
 
 from esp_idf_panic_decoder import PcAddressDecoder
 from serial.tools import miniterm
@@ -16,18 +16,18 @@ key_description = miniterm.key_description
 
 
 class Logger:
-    def __init__(self, elf_file, console, timestamps, timestamp_format, enable_address_decoding,
+    def __init__(self, elf_files, console, timestamps, timestamp_format, enable_address_decoding,
                  toolchain_prefix, rom_elf_file=None):
-        # type: (str, miniterm.Console, bool, str, bool, str, Optional[str]) -> None
+        # type: (List[str], miniterm.Console, bool, str, bool, str, Optional[str]) -> None
         self.log_file = None  # type: Optional[BinaryIO]
         self._output_enabled = True  # type: bool
         self._start_of_line = True  # type: bool
-        self.elf_file = elf_file
+        self.elf_file = elf_files[0] if elf_files else ''
         self.console = console
         self.timestamps = timestamps
         self.timestamp_format = timestamp_format
         if enable_address_decoding:
-            self.pc_address_decoder = PcAddressDecoder(toolchain_prefix, elf_file, rom_elf_file)
+            self.pc_address_decoder = PcAddressDecoder(toolchain_prefix, elf_files, rom_elf_file)
 
     @property
     def pc_address_buffer(self) -> bytes:

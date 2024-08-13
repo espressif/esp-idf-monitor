@@ -2,7 +2,7 @@
 # SPDX-License-Identifier: Apache-2.0
 import re
 import subprocess
-from typing import Optional  # noqa: F401
+from typing import List, Optional  # noqa: F401
 
 from .logger import Logger  # noqa: F401
 from .output_helpers import normal_print, red_print, yellow_print
@@ -10,13 +10,13 @@ from .web_socket_client import WebSocketClient  # noqa: F401
 
 
 class GDBHelper:
-    def __init__(self, toolchain_prefix, websocket_client, elf_file, port, baud_rate):
-        # type: (str, Optional[WebSocketClient], str, int, int) -> None
+    def __init__(self, toolchain_prefix, websocket_client, elf_files, port, baud_rate):
+        # type: (str, Optional[WebSocketClient], List[str], int, int) -> None
         self._gdb_buffer = b''  # type: bytes
         self._gdb_exit = False  # type: bool
         self.toolchain_prefix = toolchain_prefix
         self.websocket_client = websocket_client
-        self.elf_file = elf_file
+        self.elf_files = elf_files
         self.port = port
         self.baud_rate = baud_rate
 
@@ -43,7 +43,10 @@ class GDBHelper:
             cmd = ['%sgdb' % self.toolchain_prefix,
                    '-ex', 'set serial baud %d' % self.baud_rate,
                    '-ex', 'target remote %s' % self.port,
-                   self.elf_file]
+                   self.elf_files[0]]
+            for elf_file in self.elf_files[1:]:
+                cmd.append('-ex')
+                cmd.append(f'add-symbol-file {elf_file}')
             # Here we handling GDB as a process
             # Open GDB process
             try:
@@ -90,7 +93,7 @@ class GDBHelper:
                     yellow_print('Communicating through WebSocket')
                     self.websocket_client.send({'event': 'gdb_stub',
                                                 'port': self.port,
-                                                'prog': self.elf_file})
+                                                'prog': self.elf_files[0]})
                     yellow_print('Waiting for debug finished event')
                     self.websocket_client.wait([('event', 'debug_finished')])
                     yellow_print('Communications through WebSocket is finished')

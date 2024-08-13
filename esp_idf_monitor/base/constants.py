@@ -37,6 +37,7 @@ PANIC_STACK_DUMP = b'Stack memory:'
 # panic handler decoding states
 PANIC_IDLE = 0
 PANIC_READING = 1
+PANIC_READING_STACK = 2
 
 # panic handler decoding options
 PANIC_DECODE_DISABLE = 'disable'

@@ -85,7 +85,7 @@ class Monitor:
     def __init__(
         self,
         serial_instance,  # type: serial.Serial
-        elf_file,  # type: str
+        elf_files,  # type: List[str]
         print_filter,  # type: str
         make='make',  # type: str
         encrypted=False,  # type: bool
@@ -111,13 +111,13 @@ class Monitor:
         self.console.output = get_ansi_converter(self.console.output, force_color=force_color)
         self.console.byte_output = get_ansi_converter(self.console.byte_output, force_color=force_color)
 
-        self.elf_file = elf_file or ''
-        self.elf_exists = os.path.exists(self.elf_file)
-        self.logger = Logger(self.elf_file, self.console, timestamps, timestamp_format, enable_address_decoding,
+        self.elf_files = elf_files or []
+        self.elf_exists = self._check_elfs()
+        self.logger = Logger(self.elf_files, self.console, timestamps, timestamp_format, enable_address_decoding,
                              toolchain_prefix, rom_elf_file=rom_elf_file)
 
         self.coredump = CoreDump(decode_coredumps, self.event_queue, self.logger, websocket_client,
-                                 self.elf_file) if self.elf_exists else None
+                                 self.elf_files) if self.elf_exists else None
 
         # allow for possibility the "make" arg is a list of arguments (for idf.py)
         self.make = make if os.path.exists(make) else shlex.split(make)  # type: Any[Union[str, List[str]], str]
@@ -130,12 +130,12 @@ class Monitor:
             self.serial = serial_instance
             self.serial_reader = SerialReader(self.serial, self.event_queue, reset, target)  # type: Reader
 
-            self.gdb_helper = GDBHelper(toolchain_prefix, websocket_client, self.elf_file, self.serial.port,
+            self.gdb_helper = GDBHelper(toolchain_prefix, websocket_client, self.elf_files, self.serial.port,
                                         self.serial.baudrate) if self.elf_exists else None
 
         else:
             socket_test_mode = False
-            self.serial = subprocess.Popen([self.elf_file], stdin=subprocess.PIPE, stdout=subprocess.PIPE,
+            self.serial = subprocess.Popen(self.elf_files, stdin=subprocess.PIPE, stdout=subprocess.PIPE,
                                            stderr=subprocess.STDOUT, bufsize=0)
             self.serial_reader = LinuxReader(self.serial, self.event_queue)
 
@@ -143,7 +143,7 @@ class Monitor:
 
         cls = SerialHandler if self.elf_exists else SerialHandlerNoElf
         self.serial_handler = cls(b'', socket_test_mode, self.logger, decode_panic, PANIC_IDLE, b'', target,
-                                  False, False, self.serial, encrypted, self.elf_file, toolchain_prefix, disable_auto_color)
+                                  False, False, self.serial, encrypted, self.elf_files, toolchain_prefix, disable_auto_color)
 
         self.console_parser = ConsoleParser(eol)
         self.console_reader = ConsoleReader(self.console, self.event_queue, self.cmd_queue, self.console_parser,
@@ -161,6 +161,16 @@ class Monitor:
 
     def __exit__(self, exc_type, exc_val, exc_tb) -> None:  # type: ignore
         raise NotImplementedError
+
+    def _check_elfs(self) -> bool:
+        """Check if at least one file exists and print a warning if not"""
+        exists = False
+        for elf_file in self.elf_files:
+            if os.path.exists(elf_file):
+                exists = True
+            else:
+                yellow_print(f"Warning: ELF file '{elf_file}' does not exist")
+        return exists
 
     def run_make(self, target: str) -> None:
         with self:
@@ -343,12 +353,6 @@ def main() -> None:
     # use EOL from argument; defaults to LF for Linux targets and CR otherwise
     args.eol = args.eol or ('LF' if args.target == 'linux' else 'CR')
 
-    if isinstance(args.elf_file, io.BufferedReader):
-        elf_file = args.elf_file.name
-        args.elf_file.close()  # don't need this as a file
-    else:
-        elf_file = args.elf_file
-
     if isinstance(args.rom_elf_file, io.BufferedReader):
         rom_elf_file = args.rom_elf_file.name
         args.rom_elf_file.close()  # don't need this as a file
@@ -409,7 +413,7 @@ def main() -> None:
             yellow_print('--- esp-idf-monitor {v} on {p.name} {p.baudrate} ---'.format(v=__version__, p=serial_instance))
 
         monitor = cls(serial_instance,
-                      elf_file,
+                      args.elf_files,
                       args.print_filter,
                       args.make,
                       args.encrypted,

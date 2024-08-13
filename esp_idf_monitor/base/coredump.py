@@ -5,7 +5,7 @@ import os
 import queue  # noqa: F401
 import tempfile
 from contextlib import contextmanager, redirect_stdout
-from typing import Generator, Optional  # noqa: F401
+from typing import Generator, List, Optional  # noqa: F401
 
 from .constants import TAG_KEY
 from .logger import Logger  # noqa: F401
@@ -28,8 +28,8 @@ COREDUMP_DECODE_INFO = 'info'
 
 
 class CoreDump:
-    def __init__(self, decode_coredumps, event_queue, logger, websocket_client, elf_file):
-        # type: (str, queue.Queue, Logger, Optional[WebSocketClient], str) -> None
+    def __init__(self, decode_coredumps, event_queue, logger, websocket_client, elf_files):
+        # type: (str, queue.Queue, Logger, Optional[WebSocketClient], List[str]) -> None
 
         self._coredump_buffer = b''
         self._decode_coredumps = decode_coredumps
@@ -37,7 +37,7 @@ class CoreDump:
         self._reading_coredump = COREDUMP_IDLE
         self.logger = logger
         self.websocket_client = websocket_client
-        self.elf_file = elf_file
+        self.elf_files = elf_files[0]
 
     @property
     def in_progress(self) -> bool:
@@ -58,7 +58,7 @@ class CoreDump:
             yellow_print('Communicating through WebSocket')
             self.websocket_client.send({'event': 'coredump',
                                         'file': coredump_file.name,
-                                        'prog': self.elf_file})
+                                        'prog': self.elf_files})
             yellow_print('Waiting for debug finished event')
             self.websocket_client.wait([('event', 'debug_finished')])
             yellow_print('Communications through WebSocket is finished')
@@ -73,7 +73,7 @@ class CoreDump:
                 self.logger.print(self._coredump_buffer)
                 # end line will be printed in handle_serial_input
             else:
-                coredump = esp_coredump.CoreDump(core=coredump_file.name, core_format='b64', prog=self.elf_file)
+                coredump = esp_coredump.CoreDump(core=coredump_file.name, core_format='b64', prog=self.elf_files)
                 f = io.StringIO()
                 with redirect_stdout(f):
                     coredump.info_corefile()
