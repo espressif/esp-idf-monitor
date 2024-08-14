@@ -45,6 +45,13 @@ workflow:
     rm -rf ${CI_PYTHON_TOOL_REPO}
   fi
 
+.install_custom_tool_powershell: &install_custom_tool_powershell |
+  if ($env:CI_PYTHON_TOOL_REPO) {
+    git clone --quiet --depth=1 -b $env:CI_PYTHON_TOOL_BRANCH "https://gitlab-ci-token:${env:ESPCI_TOKEN}@${env:GITLAB_HTTPS_HOST}/espressif/${env:CI_PYTHON_TOOL_REPO}.git"
+    pip install ./${env:CI_PYTHON_TOOL_REPO}
+    Remove-Item -Recurse -Force ${env:CI_PYTHON_TOOL_REPO}
+  }
+
 .base_template:
   image: python:3.7-bullseye
   tags:
@@ -213,6 +220,7 @@ windows_test:
   before_script:
     - python -m pip install --upgrade pip
     - pip install -e .[dev,host_test] --prefer-binary
+    - *install_custom_tool_powershell
   script:
     - cd ${TEST_DIR}\host_test
     - coverage run -m pytest -sv test_monitor.py
