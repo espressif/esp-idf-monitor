@@ -20,9 +20,11 @@ def test_monitor_addr_lookup(config: str, coverage_run: List[str], dut: Dut) -> 
     # The port needs to be closed because esp_idf_monitor will connect to it
     dut.serial.close()
 
-    monitor_cmd = ' '.join(itertools.chain(
-        coverage_run, ['-m', 'esp_idf_monitor', os.path.join(dut.app.binary_path, 'monitor_addr_lookup.elf'), '--port', str(dut.serial.port)]
-    ))
+    monitor_args = ['--port', str(dut.serial.port), os.path.join(dut.app.binary_path, 'monitor_addr_lookup.elf')]
+    if config == 'addr_lookup_in_app':
+        # add only for in-app address lookup to test both multi elf file and single elf file support
+        monitor_args.append(os.path.join(dut.app.binary_path, 'bootloader', 'bootloader.elf'))
+    monitor_cmd = ' '.join(itertools.chain(coverage_run, ['-m', 'esp_idf_monitor'], monitor_args))
     monitor_log_path = os.path.join(dut.logdir, 'monitor.txt')
 
     with open(monitor_log_path, 'w') as log, pexpect.spawn(monitor_cmd, logfile=log, timeout=5, encoding='utf-8', codec_errors='ignore') as p:
@@ -36,6 +38,14 @@ def test_monitor_addr_lookup(config: str, coverage_run: List[str], dut: Dut) -> 
         p.expect_exact(f'{addr}: app_main at')
 
         if config == 'addr_lookup_in_app':
+            # reset the app to make sure that the bootloader address is caught
+            p.sendcontrol('T')
+            p.sendcontrol('R')
+            # check for multi elf file support, this address should not be found in the bootloader elf
+            p.expect(re.compile(rf'entry ({ADDRESS})'))
+            addr = p.match.group(1)
+            p.expect_exact(f'{addr}: call_start_cpu0 at')
+
             p.expect(re.compile(rf'Initializer function at ({ADDRESS})'))
             addr = p.match.group(1)
             p.expect_exact(f'{addr}: initialize at')

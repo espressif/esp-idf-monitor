@@ -65,9 +65,10 @@ def get_parser():  # type: () -> argparse.ArgumentParser
         )
 
     parser.add_argument(
-        'elf_file', help='ELF file of application',
-        type=lambda f: open(f, 'rb') if os.path.exists(f) else f'{f}',
-        nargs='?'
+        'elf_files', help='ELF files of application, bootloader, etc. '
+        'Please note that the order of the files also defines order in which they are used for address decoding.',
+        type=str,
+        nargs='*'
     )
 
     parser.add_argument(

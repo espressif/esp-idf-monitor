@@ -19,8 +19,8 @@ from .constants import (CMD_APP_FLASH, CMD_ENTER_BOOT, CMD_MAKE,
                         CMD_OUTPUT_TOGGLE, CMD_RESET, CMD_STOP,
                         CMD_TOGGLE_LOGGING, CMD_TOGGLE_TIMESTAMPS,
                         CONSOLE_STATUS_QUERY, PANIC_DECODE_DISABLE, PANIC_END,
-                        PANIC_IDLE, PANIC_READING, PANIC_STACK_DUMP,
-                        PANIC_START)
+                        PANIC_IDLE, PANIC_READING, PANIC_READING_STACK,
+                        PANIC_STACK_DUMP, PANIC_START)
 from .coredump import CoreDump  # noqa: F401
 from .exceptions import SerialStopException
 from .gdbhelper import GDBHelper  # noqa: F401
@@ -64,8 +64,8 @@ class SerialHandler:
     The class is responsible for buffering serial input and performing corresponding commands.
     """
     def __init__(self, last_line_part, serial_check_exit, logger, decode_panic, reading_panic, panic_buffer, target,
-                 force_line_print, start_cmd_sent, serial_instance, encrypted, elf_file, toolchain_prefix, disable_auto_color):
-        # type: (bytes, bool, Logger, str, int, bytes, str, bool, bool, serial.Serial, bool, str, str, bool) -> None
+                 force_line_print, start_cmd_sent, serial_instance, encrypted, elf_files, toolchain_prefix, disable_auto_color):
+        # type: (bytes, bool, Logger, str, int, bytes, str, bool, bool, serial.Serial, bool, List[str], str, bool) -> None
         self._last_line_part = last_line_part
         self._serial_check_exit = serial_check_exit
         self.logger = logger
@@ -77,11 +77,11 @@ class SerialHandler:
         self.start_cmd_sent = start_cmd_sent
         self.serial_instance = serial_instance
         self.encrypted = encrypted
-        self.elf_file = elf_file
+        self.elf_files = elf_files
         self.decode_error_cnt = 0
         self._trailing_color = False
         self.reset = Reset(serial_instance, target)
-        self.panic_handler = PanicOutputDecoder(toolchain_prefix, elf_file, target)
+        self.panic_handler = PanicOutputDecoder(toolchain_prefix, elf_files, target)
         self.disable_auto_color = disable_auto_color
 
     def splitdata(self, data):  # type: (bytes) -> List[bytes]
@@ -210,12 +210,13 @@ class SerialHandler:
             yellow_print('Stack dump detected')
 
         if self._reading_panic == PANIC_READING and PANIC_STACK_DUMP in line:
+            self._reading_panic = PANIC_READING_STACK
             self.logger.output_enabled = False
 
-        if self._reading_panic == PANIC_READING:
+        if self._reading_panic in [PANIC_READING, PANIC_READING_STACK]:
             self._panic_buffer += line.replace(b'\r', b'') + b'\n'
 
-        if self._reading_panic == PANIC_READING and PANIC_END in line:
+        if self._reading_panic == PANIC_READING_STACK and not line:
             self._reading_panic = PANIC_IDLE
             self.logger.output_enabled = True
             try:
@@ -233,21 +234,29 @@ class SerialHandler:
 
             self._panic_buffer = b''
 
-    def compare_elf_sha256(self, line):  # type: (str) -> None
+    def get_flashed_sha256(self, line: str) -> Optional[str]:
         elf_sha256_matcher = re.compile(
             r'ELF file SHA256:\s+(?P<sha256_flashed>[a-z0-9]+)'
         )
         file_sha256_flashed_match = re.search(elf_sha256_matcher, line)
         if not file_sha256_flashed_match:
+            return None
+        return file_sha256_flashed_match.group('sha256_flashed')
+
+    def compare_elf_sha256(self, line):  # type: (str) -> None
+        file_sha256_flashed = self.get_flashed_sha256(line)
+        if not file_sha256_flashed:
             return
-        file_sha256_flashed = file_sha256_flashed_match.group('sha256_flashed')
-        if not os.path.exists(self.elf_file):
+        if not all([os.path.exists(file) for file in self.elf_files]):
             yellow_print('ELF file not found. '
                          "You need to build & flash the project before running 'monitor', "
                          'and the binary on the device must match the one in the build directory exactly. ')
         else:
-            file_sha256_build = get_sha256(self.elf_file)
-            if file_sha256_flashed not in f'{file_sha256_build}':
+            for elf_file in self.elf_files:
+                file_sha256_build = get_sha256(elf_file)
+                if file_sha256_flashed in f'{file_sha256_build}':
+                    break
+            else:
                 yellow_print(f'Warning: checksum mismatch between flashed and built applications. '
                              f'Checksum of built application is {file_sha256_build}')
 
