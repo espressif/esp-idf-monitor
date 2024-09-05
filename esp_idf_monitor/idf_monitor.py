@@ -346,7 +346,7 @@ def detect_port() -> Union[str, NoReturn]:
 
 def main() -> None:
     if not sys.stdin.isatty() and not os.environ.get('ESP_IDF_MONITOR_TEST'):
-        sys.exit('error: Monitor requires standard input to be attached to TTY')
+        sys.exit('Error: Monitor requires standard input to be attached to TTY. Try using a different terminal.')
     parser = get_parser()
     args = parser.parse_args()
 
