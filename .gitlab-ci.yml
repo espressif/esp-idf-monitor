@@ -7,7 +7,6 @@ stages:
 
 variables:
   # System environment
-  TARGET_TEST_ENV_IMAGE: "${CI_DOCKER_REGISTRY}/target-test-env-v5.3:1"
   TEST_DIR: "$CI_PROJECT_DIR/test"
 
   # Install dependency from custom branch, for details see wiki.
@@ -52,6 +51,16 @@ workflow:
     Remove-Item -Recurse -Force ${env:CI_PYTHON_TOOL_REPO}
   }
 
+.install_host_test:
+  before_script:
+    - pip install -e .[dev,host_test] --prefer-binary
+    - *install_custom_tool
+
+.install_target_test:
+  before_script:
+    - pip install -e .[dev,ide,target_test] --prefer-binary
+    - *install_custom_tool
+
 .base_template:
   image: python:3.7-bullseye
   tags:
@@ -61,17 +70,17 @@ workflow:
     - pip install -e .[dev] --prefer-binary
     - *install_custom_tool
 
-.idf_template:
-  image: "espressif/idf:latest"
-  tags:
-    - build
-    - internet
-  before_script:
-    - pip install -e .[dev,host_test] --prefer-binary
-    - *install_custom_tool
+.idf_template_latest:
+  image: espressif/idf:latest
+  variables:
+    IDF_BRANCH: "latest"
+
+.idf_template_oldest:
+  image: espressif/idf:release-v5.1
+  variables:
+    IDF_BRANCH: "v5_1"
 
 .build_template:
-  stage: build
   tags:
     - build
   variables:
@@ -82,22 +91,11 @@ workflow:
 
 # BUILD TEST APPS
 
-# This template gets expanded multiple times, once for every IDF version.
-# IDF version is specified by setting the espressif/idf image tag.
-#
-# TEST_TARGETS sets the list of IDF_TARGET values to build the test for.
-# It should contain only the targets with optimized assembly implementations.
-#
-.before_script_build_jobs:
-  before_script:
-    - pip install -e .[dev,target_test] --prefer-binary
-    - *install_custom_tool
-
 .build_pytest_template:
   stage: build
   extends:
     - .build_template
-    - .before_script_build_jobs
+    - .install_target_test
   artifacts:
     paths:
       - "**/build*/size.json"
@@ -123,34 +121,40 @@ workflow:
       --recursive
       --target ${TEST_TARGETS}
       --default-build-targets ${TEST_TARGETS}
-      --config "sdkconfig.ci.*=" --build-dir "build_@t_@w"
+      --config "sdkconfig.ci.*=" --build-dir "build_${IDF_BRANCH}_@t_@w"
       --check-warnings
-      --ignore-warning-file ignore_build_warnings.txt
       --collect-size-info size_info.txt
       --manifest-rootpath .
       --manifest-file .build-test-rules.yml
-      --parallel-count ${CI_NODE_TOTAL:-1}
-      --parallel-index ${CI_NODE_INDEX:-1}
   variables:
     TEST_TARGETS: "esp32"
 
-build_idf_latest:
-  extends: .build_pytest_template
+.target_test_template:
+  stage: target_test
+  extends:
+    - .install_target_test
+  tags:
+    - generic
+    - esp32
+  artifacts:
+    paths:
+      - "${TEST_DIR}/results_*.xml"
+      - "${TEST_DIR}/*.txt"
+      - "${TEST_DIR}/test_apps/pytest_embedded_log/"
+      - "**/.coverage*"
+      - ".coverage*"
+    reports:
+      junit: ${TEST_DIR}/results_${IDF_TARGET}_*.xml
+    when: always
+    expire_in: 1 week
   variables:
-    IDF_BRANCH: "master"  # for filtering tests in .build-test-rules.yml
-  image: espressif/idf:latest
+    PYTHONPATH: "$PYTHONPATH:${TEST_DIR}"
+    COVERAGE_PROCESS_START: "${CI_PROJECT_DIR}/pyproject.toml"
+    IDF_TARGET: "esp32"
+  script:
+    - cd ${TEST_DIR}/test_apps
+    - pytest --junit-xml=${TEST_DIR}/results_${IDF_TARGET}_${IDF_BRANCH}.xml --target=${IDF_TARGET}
 
-build_idf_v5.2:
-  extends: .build_pytest_template
-  variables:
-    IDF_BRANCH: "release/v5.2"  # for filtering tests in .build-test-rules.yml
-  image: espressif/idf:release-v5.2
-
-build_idf_v5.1:
-  extends: .build_pytest_template
-  variables:
-    IDF_BRANCH: "release/v5.1"  # for filtering tests in .build-test-rules.yml
-  image: espressif/idf:release-v5.1
 # ------------------------------------------------------------------------------------------------------
 
 
@@ -184,9 +188,15 @@ pre-commit-mr:
 # TESTS
 # ------------------------------------------------------------------------------------------------------
 
-test_idf_monitor:
-  extends: .idf_template
+# Host test jobs
+host_test:
+  extends:
+    - .idf_template_latest
+    - .install_host_test
   stage: host_test
+  tags:
+    - build
+    - internet
   artifacts:
     # save artifacts always in order to access results which were retried without consequent failure
     when: always
@@ -202,7 +212,7 @@ test_idf_monitor:
     - cd ${TEST_DIR}
     - coverage run -m pytest -sv host_test/test_monitor.py
 
-windows_test:
+windows_host_test:
   stage: host_test
   tags:
     - windows-build
@@ -225,82 +235,54 @@ windows_test:
     - cd ${TEST_DIR}\host_test
     - coverage run -m pytest -sv test_monitor.py
 
-.before_script_pytest_jobs:
-  before_script:
-    - pip install -e .[dev,target_test] --prefer-binary
-    - *install_custom_tool
-    # Get ESP-IDF and install the tools (such as addr2line). We don't need the whole ESP-IDF, but it is easier for downloading required tools.
-    # Dowloading just the tools would require recreating the directory structure and downloading dependencies one by one.
-    - cd /opt/
-    - git clone --depth 1 -b ${IDF_BRANCH} https://gitlab-ci-token:${ESPCI_TOKEN}@${GITLAB_HTTPS_HOST}/espressif/esp-idf.git
-    - cd esp-idf
-    - echo "Using ESP-IDF branch ${IDF_BRANCH} on commit $(git rev-parse --short HEAD)"
-    - export IDF_PATH=${PWD}
-    - tools/idf_tools.py --non-interactive install && eval "$(tools/idf_tools.py --non-interactive export)" || exit 1
 
-.test_template:
-  stage: target_test
-  image: ${TARGET_TEST_ENV_IMAGE}
+# Build test jobs for target tests
+build_idf_latest:
   extends:
-    - .before_script_pytest_jobs
-  artifacts:
-    paths:
-      - "${TEST_DIR}/results_*.xml"
-      - "${TEST_DIR}/*.txt"
-      - "${TEST_DIR}/test_apps/pytest_embedded_log/"
-      - "**/.coverage*"
-      - ".coverage*"
-    reports:
-      junit: ${TEST_DIR}/results_${IDF_TARGET}_*.xml
-    when: always
-    expire_in: 1 week
-  script:
-    - cd ${TEST_DIR}/test_apps
-    - IDF_VERSION=$(echo $IDF_BRANCH | tr / _)
-    - pytest --junit-xml=${TEST_DIR}/results_${IDF_TARGET}_${IDF_VERSION}.xml --target=${IDF_TARGET}
+    - .idf_template_latest
+    - .build_pytest_template
 
-test_target_apps:
-  extends: .test_template
-  tags:
-    - generic
-    - esp32
-  variables:
-    PYTHONPATH: "$PYTHONPATH:${TEST_DIR}"
-    COVERAGE_PROCESS_START: "${CI_PROJECT_DIR}/pyproject.toml"
-  parallel:
-    matrix:
-      - IDF_BRANCH: ["release/v5.1", "release/v5.2", "master"]
-        IDF_TARGET: ["esp32"]
+build_idf_v5.1:
+  extends:
+    - .idf_template_oldest
+    - .build_pytest_template
+
+
+# Target test jobs
+test_target_apps_latest:
+  extends:
+    - .idf_template_latest
+    - .target_test_template
+
+test_target_apps_v5.1:
+  extends:
+    - .idf_template_oldest
+    - .target_test_template
 
 test_linux_apps:
+  stage: target_test
   extends:
     - .build_template
-    - .test_template
+    - .install_target_test
   image: espressif/idf:latest
   variables:
     IDF_TARGET: "linux"
     COVERAGE_PROCESS_START: "${CI_PROJECT_DIR}/pyproject.toml"
-  parallel:
-    matrix:
-      - IDF_BRANCH: ["master"]
+    IDF_BRANCH: "latest"
   script:
     - cd ${TEST_DIR}
     - python -m idf_build_apps build -v -p .
       --recursive
       --target linux
-      --config "sdkconfig.ci.*=" --build-dir "build_@t_@w"
+      --config "sdkconfig.ci.*=" --build-dir "build_${IDF_BRANCH}_@t_@w"
       --check-warnings
-      --ignore-warning-file ignore_build_warnings.txt
       --collect-size-info size_info.txt
       --manifest-rootpath .
       --manifest-file .build-test-rules.yml
-      --parallel-count ${CI_NODE_TOTAL:-1}
-      --parallel-index ${CI_NODE_INDEX:-1}
-    - IDF_VERSION=$(echo $IDF_BRANCH | tr / _)
-    # setting path before running build will break the build process
+    # setting PYTHONPATH before running build will break the build process
     - cd test_apps
     - PYTHONPATH=$PYTHONPATH:${TEST_DIR}
-    - pytest --junit-xml=${TEST_DIR}/results_${IDF_TARGET}_${IDF_VERSION}.xml --target=linux
+    - pytest --junit-xml=${TEST_DIR}/results_${IDF_TARGET}_${IDF_BRANCH}.xml --target=linux
 
 combine_reports:
   stage: report

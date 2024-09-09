@@ -75,15 +75,22 @@ def build_dir(request: pytest.FixtureRequest, app_path: str, target: Optional[st
     """
     Check local build dir with the following priority:
 
-    1. build_<target>_<config>
-    2. build_<target>
-    3. build_<config>
-    4. build
+    1. build_<$IDF_BRANCH>_<target>_<config>
+    2. build_<$IDF_BRANCH>_<target>
+    3. build_<target>_<config>
+    4. build_<target>
+    5. build_<config>
+    6. build
 
     Returns:
         valid build directory
     """
+    idf_version = os.getenv('IDF_BRANCH', None)
     check_dirs = []
+    if idf_version is not None and target is not None and config is not None:
+        check_dirs.append(f'build_{idf_version}_{target}_{config}')
+    if idf_version is not None and target is not None:
+        check_dirs.append(f'build_{idf_version}_{target}')
     if target is not None and config is not None:
         check_dirs.append(f'build_{target}_{config}')
     if target is not None:

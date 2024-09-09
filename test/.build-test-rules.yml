@@ -1,7 +1,7 @@
 test_apps/linux_target:
   enable:
-    - if: IDF_TARGET == "linux" and IDF_BRANCH == "master"
-      reason: Only master branch of IDF supports linux target properly at the moment
+    - if: IDF_TARGET == "linux" and IDF_BRANCH == "latest"
+      reason: Only latest IDF supports linux target properly at the moment
 
 test_apps/monitor_addr_lookup:
   enable:
