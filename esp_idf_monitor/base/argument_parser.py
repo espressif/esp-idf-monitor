@@ -1,4 +1,4 @@
-# SPDX-FileCopyrightText: 2015-2023 Espressif Systems (Shanghai) CO LTD
+# SPDX-FileCopyrightText: 2015-2024 Espressif Systems (Shanghai) CO LTD
 # SPDX-License-Identifier: Apache-2.0
 
 import argparse
@@ -139,5 +139,14 @@ def get_parser():  # type: () -> argparse.ArgumentParser
         help='Disable automatic color addition to monitor output based on the log level',
         default=False,
         action='store_true')
+
+    parser.add_argument(
+        '--open-port-attempts',
+        help='Number of attempts to wait for the port to appear (useful if the device is not connected or in deep sleep). '
+        'The delay between attempts can be defined by the `reconnect_delay` option in a configuration file (by default 0.5 sec). '
+        'Use 0 for infinite attempts.',
+        default=1,
+        type=int
+    )
 
     return parser

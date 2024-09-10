@@ -1,5 +1,7 @@
-# SPDX-FileCopyrightText: 2015-2023 Espressif Systems (Shanghai) CO LTD
+# SPDX-FileCopyrightText: 2015-2024 Espressif Systems (Shanghai) CO LTD
 # SPDX-License-Identifier: Apache-2.0
+
+from esp_idf_monitor.base.key_config import cfg
 
 # Control-key characters
 CTRL_C = '\x03'
@@ -46,6 +48,7 @@ PANIC_DECODE_BACKTRACE = 'backtrace'
 EVENT_QUEUE_TIMEOUT = 0.03  # timeout before raising queue.Empty exception in case of empty event queue
 
 ESPPORT_ENVIRON = str('ESPPORT')
+ESPTOOL_OPEN_PORT_ATTEMPTS_ENVIRON = str('ESPTOOL_OPEN_PORT_ATTEMPTS')
 MAKEFLAGS_ENVIRON = 'MAKEFLAGS'
 
 GDB_UART_CONTINUE_COMMAND = '+$c#63'
@@ -56,7 +59,7 @@ GDB_EXIT_TIMEOUT = 0.3  # time delay between exit and writing GDB_UART_CONTINUE_
 LAST_LINE_THREAD_INTERVAL = 0.1
 
 MINIMAL_EN_LOW_DELAY = 0.005
-RECONNECT_DELAY = 0.5  # timeout between reconnect tries
+RECONNECT_DELAY = cfg.getint('reconnect_delay', 0.5)  # timeout between reconnect tries
 CHECK_ALIVE_FLAG_TIMEOUT = 0.25  # timeout for checking alive flags (currently used by serial reader)
 
 # closing wait timeout for serial port

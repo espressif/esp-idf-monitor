@@ -9,7 +9,7 @@
 # - If core dump output is detected, it is converted to a human-readable report
 #   by espcoredump.py.
 #
-# SPDX-FileCopyrightText: 2015-2023 Espressif Systems (Shanghai) CO LTD
+# SPDX-FileCopyrightText: 2015-2024 Espressif Systems (Shanghai) CO LTD
 # SPDX-License-Identifier: Apache-2.0
 #
 # Contains elements taken from miniterm "Very simple serial terminal" which
@@ -44,6 +44,7 @@ from esp_idf_monitor.base.constants import (CTRL_C, CTRL_H,
                                             DEFAULT_TARGET_RESET,
                                             DEFAULT_TOOLCHAIN_PREFIX,
                                             ESPPORT_ENVIRON,
+                                            ESPTOOL_OPEN_PORT_ATTEMPTS_ENVIRON,
                                             EVENT_QUEUE_TIMEOUT,
                                             FILTERED_PORTS, GDB_EXIT_TIMEOUT,
                                             GDB_UART_CONTINUE_COMMAND,
@@ -90,6 +91,7 @@ class Monitor:
         make='make',  # type: str
         encrypted=False,  # type: bool
         reset=DEFAULT_TARGET_RESET,  # type: bool
+        open_port_attempts=1,  # type: int
         toolchain_prefix=DEFAULT_TOOLCHAIN_PREFIX,  # type: str
         eol='CRLF',  # type: str
         decode_coredumps=COREDUMP_DECODE_INFO,  # type: str
@@ -128,7 +130,7 @@ class Monitor:
             # testing hook: when running tests, input from console is ignored
             socket_test_mode = os.environ.get('ESP_IDF_MONITOR_TEST') == '1'
             self.serial = serial_instance
-            self.serial_reader = SerialReader(self.serial, self.event_queue, reset, target)  # type: Reader
+            self.serial_reader = SerialReader(self.serial, self.event_queue, reset, open_port_attempts, target)  # type: Reader
 
             self.gdb_helper = GDBHelper(toolchain_prefix, websocket_client, self.elf_files, self.serial.port,
                                         self.serial.baudrate) if self.elf_exists else None
@@ -407,7 +409,7 @@ def main() -> None:
             # has a check for this).
             # To make sure the key as well as the value are str type, by the requirements of subprocess
             espport_val = str(args.port)
-            os.environ.update({ESPPORT_ENVIRON: espport_val})
+            os.environ.update({ESPPORT_ENVIRON: espport_val, ESPTOOL_OPEN_PORT_ATTEMPTS_ENVIRON: str(args.open_port_attempts)})
 
             cls = SerialMonitor
             yellow_print('--- esp-idf-monitor {v} on {p.name} {p.baudrate} ---'.format(v=__version__, p=serial_instance))
@@ -418,6 +420,7 @@ def main() -> None:
                       args.make,
                       args.encrypted,
                       not args.no_reset,
+                      args.open_port_attempts,
                       args.toolchain_prefix,
                       args.eol,
                       args.decode_coredumps,
