@@ -92,12 +92,12 @@ def test_monitor_ide_integration(config: str, coverage_run: List[str], dut: Dut,
                                                            encoding='utf-8',
                                                            codec_errors='ignore') as p:
         p.expect(re.compile(r'Guru Meditation Error'), timeout=10)
-        p.expect_exact('Communicating through WebSocket')
+        p.expect_exact('--- Communicating through WebSocket')
         # The elements of dictionary can be printed in different order depending on the Python version.
         p.expect(re.compile(r"WebSocket sent: \{.*'event': '" + config + "'"))
-        p.expect_exact('Waiting for debug finished event')
+        p.expect_exact('--- Waiting for debug finished event')
         p.expect(re.compile(r"WebSocket received: \{'event': 'debug_finished'\}"))
-        p.expect_exact('Communications through WebSocket is finished')
+        p.expect_exact('--- Communications through WebSocket is finished')
         # end monitor and wait for proper termination to ensure complete coverage report
         p.sendcontrol(']')
         p.expect_exact(pexpect.EOF)
@@ -130,8 +130,8 @@ def test_monitor_decode(config: str, coverage_run: List[str], dut: Dut) -> None:
             p.expect_exact('Quit anyway? (y or n)')
             p.sendline('y')
         else:
-            p.expect_exact('Core dump started (further output muted)')
-            p.expect_exact('Core dump finished!')
+            p.expect_exact('--- Core dump started (further output muted)')
+            p.expect_exact('--- Core dump finished!')
             p.expect_exact('==================== ESP32 CORE DUMP START ====================')
             p.expect_exact('===================== ESP32 CORE DUMP END =====================')
         # end monitor and wait for proper termination to ensure complete coverage report

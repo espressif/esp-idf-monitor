@@ -18,7 +18,7 @@ from .key_config import (CHIP_RESET_BOOTLOADER_KEY, CHIP_RESET_KEY,
                          RECOMPILE_UPLOAD_APP_KEY, RECOMPILE_UPLOAD_KEY,
                          SKIP_MENU_KEY, TOGGLE_LOG_KEY, TOGGLE_OUTPUT_KEY,
                          TOGGLE_TIMESTAMPS_KEY)
-from .output_helpers import red_print
+from .output_helpers import COMMON_PREFIX, error_print, red_print
 
 key_description = miniterm.key_description
 
@@ -27,7 +27,7 @@ def prompt_next_action(reason, console, console_parser, event_queue, cmd_queue):
     # type: (str, miniterm.Console, ConsoleParser, queue.Queue, queue.Queue) -> None
     console.setup()  # set up console to trap input characters
     try:
-        red_print(f'--- {reason}')
+        red_print(f'{COMMON_PREFIX} {reason}')
         red_print(console_parser.get_next_action_text())
 
         k = MENU_KEY  # ignore CTRL-T here, so people can muscle-memory Ctrl-T Ctrl-F, etc.
@@ -95,43 +95,43 @@ class ConsoleParser(object):
         elif c in [EXIT_MENU_KEY, 'x', 'X']:  # Exiting from within the menu
             ret = (TAG_CMD, CMD_STOP)
         else:
-            red_print(f'--- unknown menu character {key_description(c)} --')
+            error_print(f'Unknown menu character {key_description(c)}')
 
         self._pressed_menu_key = False
         return ret
 
     def get_help_text(self):  # type: () -> str
         text = f"""\
-            --- esp_idf_monitor ({__version__}) - ESP-IDF Monitor tool
-            --- based on miniterm from pySerial
-            ---
-            --- {key_description(EXIT_KEY):8} Exit program
-            --- {key_description(MENU_KEY):8} Menu escape key, followed by:
-            --- Menu keys:
-            ---    {key_description(MENU_KEY):14} Send the menu character itself to remote
-            ---    {key_description(EXIT_KEY):14} Send the exit character itself to remote
-            ---    {key_description(CHIP_RESET_KEY):14} Reset target board via RTS line
-            ---    {key_description(RECOMPILE_UPLOAD_KEY):14} Build & flash project
-            ---    {key_description(RECOMPILE_UPLOAD_APP_KEY) + ' (or A)':14} Build & flash app only
-            ---    {key_description(TOGGLE_OUTPUT_KEY):14} Toggle output display
-            ---    {key_description(TOGGLE_LOG_KEY):14} Toggle saving output into file
-            ---    {key_description(TOGGLE_TIMESTAMPS_KEY) + ' (or I)':14} Toggle printing timestamps
-            ---    {key_description(CHIP_RESET_BOOTLOADER_KEY):14} Reset target into bootloader via the DTR/RTS lines
-            ---    {key_description(EXIT_MENU_KEY) + ' (or X)':14} Exit program"""
+            {COMMON_PREFIX} esp_idf_monitor ({__version__}) - ESP-IDF Monitor tool
+            {COMMON_PREFIX} based on miniterm from pySerial
+            {COMMON_PREFIX}
+            {COMMON_PREFIX} {key_description(EXIT_KEY):8} Exit program
+            {COMMON_PREFIX} {key_description(MENU_KEY):8} Menu escape key, followed by:
+            {COMMON_PREFIX} Menu keys:
+            {COMMON_PREFIX}    {key_description(MENU_KEY):14} Send the menu character itself to remote
+            {COMMON_PREFIX}    {key_description(EXIT_KEY):14} Send the exit character itself to remote
+            {COMMON_PREFIX}    {key_description(CHIP_RESET_KEY):14} Reset target board via RTS line
+            {COMMON_PREFIX}    {key_description(RECOMPILE_UPLOAD_KEY):14} Build & flash project
+            {COMMON_PREFIX}    {key_description(RECOMPILE_UPLOAD_APP_KEY) + ' (or A)':14} Build & flash app only
+            {COMMON_PREFIX}    {key_description(TOGGLE_OUTPUT_KEY):14} Toggle output display
+            {COMMON_PREFIX}    {key_description(TOGGLE_LOG_KEY):14} Toggle saving output into file
+            {COMMON_PREFIX}    {key_description(TOGGLE_TIMESTAMPS_KEY) + ' (or I)':14} Toggle printing timestamps
+            {COMMON_PREFIX}    {key_description(CHIP_RESET_BOOTLOADER_KEY):14} Reset target into bootloader via the DTR/RTS lines
+            {COMMON_PREFIX}    {key_description(EXIT_MENU_KEY) + ' (or X)':14} Exit program"""
 
         if SKIP_MENU_KEY:
-            text += """
-            ---
-            --- Using the "skip_menu_key" option from a config file. Commands can be executed without pressing the menu escape key.
+            text += f"""
+            {COMMON_PREFIX}
+            {COMMON_PREFIX} Using the "skip_menu_key" option from a config file. Commands can be executed without pressing the menu escape key.
             """
         return textwrap.dedent(text)
 
     def get_next_action_text(self):  # type: () -> str
         text = f"""\
-            --- Press {key_description(EXIT_KEY)} to exit monitor.
-            --- Press {key_description(RECOMPILE_UPLOAD_KEY)} to build & flash project.
-            --- Press {key_description(RECOMPILE_UPLOAD_APP_KEY)} to build & flash app.
-            --- Press any other key to resume monitor (resets target).
+            {COMMON_PREFIX} Press {key_description(EXIT_KEY)} to exit monitor.
+            {COMMON_PREFIX} Press {key_description(RECOMPILE_UPLOAD_KEY)} to build & flash project.
+            {COMMON_PREFIX} Press {key_description(RECOMPILE_UPLOAD_APP_KEY)} to build & flash app.
+            {COMMON_PREFIX} Press any other key to resume monitor (resets target).
         """
         return textwrap.dedent(text)
 

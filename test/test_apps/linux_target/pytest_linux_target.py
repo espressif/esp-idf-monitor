@@ -18,12 +18,12 @@ def test_linux_target(coverage_run: List[str], dut: Dut) -> None:
     monitor_log_path = os.path.join(dut.logdir, 'monitor.txt')
 
     with open(monitor_log_path, 'w') as log, pexpect.spawn(monitor_cmd, logfile=log, timeout=5, encoding='utf-8', codec_errors='ignore') as p:
-        p.expect_exact(f'--- esp-idf-monitor {__version__} on linux ---')
+        p.expect_exact(f'--- esp-idf-monitor {__version__} on linux')
         p.expect_exact('Hello world!')
         # try some unsupported command for linux e.g. resetting the target
         p.sendcontrol('T')
         p.sendcontrol('R')
-        p.expect_exact('linux target does not support this command')
+        p.expect_exact('--- Warning: Linux target does not support this command')
         # end monitor
         p.sendcontrol(']')
         # read the rest of the input

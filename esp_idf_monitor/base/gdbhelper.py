@@ -5,7 +5,7 @@ import subprocess
 from typing import List, Optional  # noqa: F401
 
 from .logger import Logger  # noqa: F401
-from .output_helpers import normal_print, red_print, yellow_print
+from .output_helpers import error_print, normal_print, note_print
 from .web_socket_client import WebSocketClient  # noqa: F401
 
 
@@ -62,7 +62,7 @@ class GDBHelper:
                     pass  # We ignore the Ctrl+C
             self.gdb_exit = True
         except OSError as e:
-            red_print('%s: %s' % (' '.join(cmd), e))
+            error_print(f"{' '.join(cmd)}: {e}")
         except KeyboardInterrupt:
             pass  # happens on Windows, maybe other OSes
         finally:
@@ -90,15 +90,15 @@ class GDBHelper:
                 return False
             if chsum == calc_chsum:
                 if self.websocket_client:
-                    yellow_print('Communicating through WebSocket')
+                    note_print('Communicating through WebSocket')
                     self.websocket_client.send({'event': 'gdb_stub',
                                                 'port': self.port,
                                                 'prog': self.elf_files[0]})
-                    yellow_print('Waiting for debug finished event')
+                    note_print('Waiting for debug finished event')
                     self.websocket_client.wait([('event', 'debug_finished')])
-                    yellow_print('Communications through WebSocket is finished')
+                    note_print('Communications through WebSocket is finished')
                 else:
                     return True
             else:
-                red_print('Malformed gdb message... calculated checksum %02x received %02x' % (chsum, calc_chsum))
+                error_print('Malformed gdb message... calculated checksum %02x received %02x' % (chsum, calc_chsum))
         return False

@@ -11,7 +11,7 @@ from serial.tools import list_ports
 
 from esp_idf_monitor.base.chip_specific_config import get_chip_config
 from esp_idf_monitor.base.constants import HIGH, LOW, USB_JTAG_SERIAL_PID
-from esp_idf_monitor.base.output_helpers import red_print, yellow_print
+from esp_idf_monitor.base.output_helpers import error_print, note_print
 from esp_idf_monitor.config import Config
 
 if os.name != 'nt':
@@ -83,7 +83,7 @@ class Reset:
     def _setDTRandRTS(self, dtr: bool = HIGH, rts: bool = HIGH) -> None:
         """Set DTR and RTS at the same time, this is only supported on linux with custom reset sequence"""
         if not self.serial_instance.is_open:
-            red_print('Serial port is not connected')
+            error_print('Serial port is not connected')
             return None
         status = struct.unpack(
             'I', fcntl.ioctl(self.serial_instance.fileno(), TIOCMGET, struct.pack('I', 0))
@@ -104,7 +104,7 @@ class Reset:
             cmds = seq_str.split('|')
             fn_calls_list = [self.format_dict[cmd[0]].format(cmd[1:]) for cmd in cmds]
         except Exception as e:
-            red_print(f'Invalid "custom_reset_sequence" option format: {e}')
+            error_print(f'Invalid "custom_reset_sequence" option format: {e}')
             return ''
         return '\n'.join(fn_calls_list)
 
@@ -119,7 +119,7 @@ class Reset:
         if self.custom_seq:
             # use custom reset sequence set in config file
             source = 'from esptool ' if self.esptool_config else ''
-            yellow_print(f'--- Using custom reset sequence {source}config file: {self.config_path}')
+            note_print(f'Using custom reset sequence {source}config file: {self.config_path}')
             exec(self._parse_string_to_seq(self.custom_seq))
         elif self.port_pid == USB_JTAG_SERIAL_PID:
             # use reset sequence for JTAG

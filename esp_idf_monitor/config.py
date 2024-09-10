@@ -6,7 +6,7 @@
 import configparser
 import os
 
-from esp_idf_monitor.base.output_helpers import yellow_print
+from esp_idf_monitor.base.output_helpers import note_print
 
 VALID_OPTIONS = [
     'menu_key',
@@ -45,11 +45,11 @@ class Config:
                     unknown_options = list(set(config.options(self.config_name)) - set(VALID_OPTIONS))
                     unknown_options.sort()
                     if len(unknown_options) != 0:
-                        yellow_print(f"--- Ignoring unknown configuration options: {', '.join(unknown_options)}")
+                        note_print(f"Ignoring unknown configuration options: {', '.join(unknown_options)}")
                 return True
         except (UnicodeDecodeError, configparser.Error) as e:
             if verbose:
-                yellow_print(f'--- Ignoring invalid configuration file {file_path}: {e}')
+                note_print(f'Ignoring invalid configuration file {file_path}: {e}')
         return False
 
     def find_configuration_file(self, dir_path, verbose=False):
@@ -87,7 +87,7 @@ class Config:
             config.read(config_file_path)
             if verbose:
                 msg = f' (set with {self.env_var_name} environment variable)' if set_with_env_var else ''
-                yellow_print(
-                    f'--- Loaded custom configuration from {os.path.abspath(config_file_path)}{msg}'
+                note_print(
+                    f'Loaded custom configuration from {os.path.abspath(config_file_path)}{msg}'
                 )
         return config, config_file_path

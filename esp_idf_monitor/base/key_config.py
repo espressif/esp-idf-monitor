@@ -5,7 +5,7 @@ from typing import Optional
 
 from esp_idf_monitor.config import Config
 
-from .output_helpers import red_print
+from .output_helpers import error_print
 
 cfg, _ = Config().load_configuration()
 cfg = cfg['esp-idf-monitor']
@@ -18,8 +18,8 @@ def key_to_hex(key: Optional[str], default: str) -> str:
     # convert key from string to C0 escape code
     C0_code = ascii_code - ord('@')
     if C0_code < 1 or C0_code > 32:
-        red_print(f"--- Error: Unsupported configuration for key: '{key}', please use just the English alphabet "
-                  f"characters (A-Z) and [,],\\,^,_. Using the default option '{default}'.")
+        error_print(f"Unsupported configuration for key: '{key}', please use just the English alphabet "
+                    f"characters (A-Z) and [,],\\,^,_. Using the default option '{default}'.")
         C0_code = ord(default) - ord('@')
     return chr(C0_code)
 
