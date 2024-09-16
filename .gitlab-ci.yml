@@ -148,10 +148,11 @@ workflow:
     when: always
     expire_in: 1 week
   variables:
-    PYTHONPATH: "$PYTHONPATH:${TEST_DIR}"
     COVERAGE_PROCESS_START: "${CI_PROJECT_DIR}/pyproject.toml"
     IDF_TARGET: "esp32"
   script:
+    # setting PYTHONPATH before running activate script on newest IDF will cause an error because of missing coverage
+    - PYTHONPATH="$PYTHONPATH:${TEST_DIR}"
     - cd ${TEST_DIR}/test_apps
     - pytest --junit-xml=${TEST_DIR}/results_${IDF_TARGET}_${IDF_BRANCH}.xml --target=${IDF_TARGET}
 
@@ -206,9 +207,10 @@ host_test:
       - ".coverage*"
     expire_in: 1 week
   variables:
-    PYTHONPATH: "$PYTHONPATH:${TEST_DIR}"
     COVERAGE_PROCESS_START: "${CI_PROJECT_DIR}/pyproject.toml"
   script:
+    # setting PYTHONPATH before running activate script on newest IDF will cause an error because of missing coverage
+    - PYTHONPATH="$PYTHONPATH:${TEST_DIR}"
     - cd ${TEST_DIR}
     - coverage run -m pytest -sv host_test/test_monitor.py
 
