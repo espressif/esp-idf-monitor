@@ -10,7 +10,7 @@ from serial.tools import miniterm
 
 from esp_idf_monitor.base.key_config import MENU_KEY, TOGGLE_OUTPUT_KEY
 
-from .output_helpers import red_print, yellow_print
+from .output_helpers import error_print, note_print
 
 key_description = miniterm.key_description
 
@@ -69,18 +69,18 @@ class Logger:
                                           datetime.datetime.now().strftime('%Y%m%d%H%M%S'))
             try:
                 self.log_file = open(name, 'wb+')
-                yellow_print('\nLogging is enabled into file {}'.format(name))
+                note_print(f'Logging is enabled into file {name}', prefix='\n')
             except Exception as e:  # noqa
-                red_print('\nLog file {} cannot be created: {}'.format(name, e))
+                error_print(f'Log file {name} cannot be created: {e}', prefix='\n')
 
     def stop_logging(self):  # type: () -> None
         if self._log_file:
             try:
                 name = self._log_file.name
                 self._log_file.close()
-                yellow_print('\nLogging is disabled and file {} has been closed'.format(name))
+                note_print(f'Logging is disabled and file {name} has been closed', prefix='\n')
             except Exception as e:  # noqa
-                red_print('\nLog file cannot be closed: {}'.format(e))
+                error_print(f'Log file cannot be closed: {e}', prefix='\n')
             finally:
                 self._log_file = None
 
@@ -128,19 +128,19 @@ class Logger:
                     string = string.encode()  # type: ignore
                 self._log_file.write(string)  # type: ignore
             except Exception as e:
-                red_print('\nCannot write to file: {}'.format(e))
+                error_print(f'Cannot write to file: {e}', prefix='\n')
                 # don't fill-up the screen with the previous errors (probably consequent prints would fail also)
                 self.stop_logging()
 
     def output_toggle(self):  # type: () -> None
         self.output_enabled = not self.output_enabled
-        yellow_print(f'\nToggle output display: {self.output_enabled}, '
-                     f'Type {key_description(MENU_KEY)} {key_description(TOGGLE_OUTPUT_KEY)} '
-                     'to show/disable output again.')
+        note_print(f'Toggle output display: {self.output_enabled}, '
+                   f'Type {key_description(MENU_KEY)} {key_description(TOGGLE_OUTPUT_KEY)} '
+                   'to show/disable output again.', prefix='\n')
 
     def handle_possible_pc_address_in_line(self, line: bytes) -> None:
         if not self.pc_address_decoder:
             return
         translation = self.pc_address_decoder.decode_address(line)
         if translation:
-            self.print(translation, console_printer=yellow_print)
+            self.print(translation, console_printer=note_print)

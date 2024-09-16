@@ -11,7 +11,7 @@ from serial.tools import list_ports
 
 from .constants import (ASYNC_CLOSING_WAIT_NONE, CHECK_ALIVE_FLAG_TIMEOUT,
                         FILTERED_PORTS, HIGH, LOW, RECONNECT_DELAY, TAG_SERIAL)
-from .output_helpers import red_print, yellow_print
+from .output_helpers import error_print, note_print, yellow_print
 from .reset import Reset
 from .stoppable_thread import StoppableThread
 
@@ -63,7 +63,7 @@ class SerialReader(Reader):
                             if not p.device.endswith(FILTERED_PORTS)
                         ]
                     )
-                    yellow_print(f'Connection to {self.serial.portstr} failed. Available ports:\n{port_list}')
+                    note_print(f'Connection to {self.serial.portstr} failed. Available ports:\n{port_list}')
                     return
             self.gdb_exit = False
         try:
@@ -78,8 +78,8 @@ class SerialReader(Reader):
                     data = b''
                     # self.serial.open() was successful before, therefore, this is an issue related to
                     # the disappearance of the device
-                    red_print(str(e))
-                    yellow_print('Waiting for the device to reconnect', newline='')
+                    error_print(str(e))
+                    note_print('Waiting for the device to reconnect', newline='')
                     self.close_serial()
                     while self.alive:  # so that exiting monitor works while waiting
                         try:

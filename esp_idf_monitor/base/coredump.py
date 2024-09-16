@@ -9,7 +9,7 @@ from typing import Generator, List, Optional  # noqa: F401
 
 from .constants import TAG_KEY
 from .logger import Logger  # noqa: F401
-from .output_helpers import yellow_print
+from .output_helpers import note_print, warning_print
 from .web_socket_client import WebSocketClient  # noqa: F401
 
 # coredump related messages
@@ -55,19 +55,19 @@ class CoreDump:
 
         if self.websocket_client:
             self.logger.output_enabled = True
-            yellow_print('Communicating through WebSocket')
+            note_print('Communicating through WebSocket')
             self.websocket_client.send({'event': 'coredump',
                                         'file': coredump_file.name,
                                         'prog': self.elf_files})
-            yellow_print('Waiting for debug finished event')
+            note_print('Waiting for debug finished event')
             self.websocket_client.wait([('event', 'debug_finished')])
-            yellow_print('Communications through WebSocket is finished')
+            note_print('Communications through WebSocket is finished')
         else:
             try:
                 import esp_coredump
             except ImportError as e:
-                yellow_print('Failed to parse core dump info: '
-                             'Module {} is not installed \n\n'.format(e.name))
+                warning_print('Failed to parse core dump info: '
+                              f'Module {e.name} is not installed\n\n')
                 self.logger.output_enabled = True
                 self.logger.print(COREDUMP_UART_START + b'\n')
                 self.logger.print(self._coredump_buffer)
@@ -85,24 +85,24 @@ class CoreDump:
             try:
                 os.unlink(coredump_file.name)
             except OSError as e:
-                yellow_print('Couldn\'t remote temporary core dump file ({})'.format(e))
+                warning_print(f'Couldn\'t remote temporary core dump file ({e})')
 
     def _check_coredump_trigger_before_print(self, line):  # type: (bytes) -> None
         if self._decode_coredumps == COREDUMP_DECODE_DISABLE:
             return
         if COREDUMP_UART_PROMPT in line:
-            yellow_print('Initiating core dump!')
+            note_print('Initiating core dump!')
             self.event_queue.put((TAG_KEY, '\n'))
             return
         if COREDUMP_UART_START in line:
-            yellow_print('Core dump started (further output muted)')
+            note_print('Core dump started (further output muted)')
             self._reading_coredump = COREDUMP_READING
             self._coredump_buffer = b''
             self.logger.output_enabled = False
             return
         if COREDUMP_UART_END in line:
             self._reading_coredump = COREDUMP_DONE
-            yellow_print('\nCore dump finished!')
+            note_print('Core dump finished!', prefix='\n')
             self._process_coredump()
             return
         if self._reading_coredump == COREDUMP_READING:
@@ -111,7 +111,7 @@ class CoreDump:
             self._coredump_buffer += line.replace(b'\r', b'') + b'\n'
             new_buffer_len_kb = len(self._coredump_buffer) // kb
             if new_buffer_len_kb > buffer_len_kb:
-                yellow_print('Received %3d kB...' % new_buffer_len_kb, newline='\r')
+                note_print('Received %3d kB...' % new_buffer_len_kb, newline='\r')
 
     def _check_coredump_trigger_after_print(self):  # type: () -> None
         if self._decode_coredumps == COREDUMP_DECODE_DISABLE:

@@ -28,7 +28,8 @@ from .key_config import CHIP_RESET_KEY, EXIT_KEY, MENU_KEY
 from .line_matcher import LineMatcher  # noqa: F401
 from .logger import Logger  # noqa: F401
 from .output_helpers import (ANSI_GREEN_B, ANSI_NORMAL_B, ANSI_RED_B,
-                             ANSI_YELLOW_B, AUTO_COLOR_REGEX, yellow_print)
+                             ANSI_YELLOW_B, AUTO_COLOR_REGEX, note_print,
+                             warning_print)
 from .reset import Reset
 from .serial_reader import Reader  # noqa: F401
 
@@ -47,7 +48,7 @@ def run_make(target, make, console, console_parser, event_queue, cmd_queue, logg
         popen_args = make + [target]
     else:
         popen_args = [make, target]
-    yellow_print('Running %s...' % ' '.join(popen_args))
+    note_print('Running %s...' % ' '.join(popen_args))
     p = subprocess.Popen(popen_args, env=os.environ)
     try:
         p.wait()
@@ -161,7 +162,7 @@ class SerialHandler:
                     decoded_line = line_strip.decode(errors='ignore')
                     self.decode_error_cnt += 1
                     if self.decode_error_cnt >= 3:
-                        yellow_print('Failed to decode multiple lines in a row. Try checking the baud rate and XTAL frequency setting in menuconfig')
+                        warning_print('Failed to decode multiple lines in a row. Try checking the baud rate and XTAL frequency setting in menuconfig')
                         self.decode_error_cnt = 0
                 if self._force_line_print or line_matcher.match(decoded_line):
                     self.print_colored(line)
@@ -207,7 +208,7 @@ class SerialHandler:
 
         if self._reading_panic == PANIC_IDLE and re.search(PANIC_START, line.decode('ascii', errors='ignore')):
             self._reading_panic = PANIC_READING
-            yellow_print('Stack dump detected')
+            note_print('Stack dump detected')
 
         if self._reading_panic == PANIC_READING and PANIC_STACK_DUMP in line:
             self._reading_panic = PANIC_READING_STACK
@@ -222,10 +223,10 @@ class SerialHandler:
             try:
                 out = self.panic_handler.process_panic_output(self._panic_buffer)
                 if out:
-                    yellow_print('\nBacktrace:\n\n')
+                    note_print('Backtrace:\n\n', prefix='\n')
                     self.logger.print(out)
             except subprocess.CalledProcessError as e:
-                yellow_print(f'Failed to run gdb_panic_server.py script: {e}\n{e.output}\n\n')
+                warning_print(f'Failed to run gdb_panic_server.py script: {e}\n{e.output}\n\n')
                 # in case of error, print the rest of panic buffer that wasn't logged yet
                 # we stopped logging with PANIC_STACK_DUMP and re-enabled logging with PANIC_END
                 l_idx = self._panic_buffer.find(PANIC_STACK_DUMP)
@@ -248,17 +249,17 @@ class SerialHandler:
         if not file_sha256_flashed:
             return
         if not all([os.path.exists(file) for file in self.elf_files]):
-            yellow_print('ELF file not found. '
-                         "You need to build & flash the project before running 'monitor', "
-                         'and the binary on the device must match the one in the build directory exactly. ')
+            warning_print('ELF file not found. '
+                          "You need to build & flash the project before running 'monitor', "
+                          'and the binary on the device must match the one in the build directory exactly. ')
         else:
             for elf_file in self.elf_files:
                 file_sha256_build = get_sha256(elf_file)
                 if file_sha256_flashed in f'{file_sha256_build}':
                     break
             else:
-                yellow_print(f'Warning: checksum mismatch between flashed and built applications. '
-                             f'Checksum of built application is {file_sha256_build}')
+                warning_print(f'Checksum mismatch between flashed and built applications. '
+                              f'Checksum of built application is {file_sha256_build}')
 
     def handle_commands(self, cmd, chip, run_make_func, console_reader, serial_reader):
         # type: (int, str, Callable, ConsoleReader, Reader) -> None
@@ -268,7 +269,7 @@ class SerialHandler:
                        CMD_MAKE,
                        CMD_APP_FLASH,
                        CMD_ENTER_BOOT]:
-                yellow_print('linux target does not support this command')
+                warning_print('Linux target does not support this command')
                 return
 
         if cmd == CMD_STOP:
@@ -288,7 +289,7 @@ class SerialHandler:
         elif cmd == CMD_TOGGLE_TIMESTAMPS:
             self.logger.toggle_timestamps()
         elif cmd == CMD_ENTER_BOOT:
-            yellow_print(f'Pause app (enter bootloader mode), press {key_description(MENU_KEY)} {key_description(CHIP_RESET_KEY)} to restart')
+            note_print(f'Pause app (enter bootloader mode), press {key_description(MENU_KEY)} {key_description(CHIP_RESET_KEY)} to restart')
             self.reset.to_bootloader()
         else:
             raise RuntimeError('Bad command data %d' % cmd)  # type: ignore

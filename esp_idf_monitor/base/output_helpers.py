@@ -19,6 +19,8 @@ ANSI_NORMAL_B = ANSI_NORMAL.encode()
 
 AUTO_COLOR_REGEX = re.compile(rb'^(I|W|E) \(\d+\)')
 
+COMMON_PREFIX = '---'
+
 
 def color_print(message: str, color: str, newline: Optional[str] = '\n') -> None:
     """ Print a message to stderr with colored highlighting """
@@ -40,3 +42,15 @@ def green_print(message: str, newline: Optional[str] = '\n') -> None:
 
 def red_print(message: str, newline: Optional[str] = '\n') -> None:
     color_print(message, ANSI_RED, newline)
+
+
+def note_print(message: str, newline: Optional[str] = '\n', prefix: str = '') -> None:
+    yellow_print(f'{prefix}{COMMON_PREFIX} {message}', newline=newline)
+
+
+def warning_print(message: str, newline: Optional[str] = '\n', prefix: str = '') -> None:
+    yellow_print(f'{prefix}{COMMON_PREFIX} Warning: {message}', newline=newline)
+
+
+def error_print(message: str, newline: Optional[str] = '\n', prefix: str = '') -> None:
+    red_print(f'{prefix}{COMMON_PREFIX} Error: {message}', newline=newline)

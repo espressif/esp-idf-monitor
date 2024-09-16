@@ -59,7 +59,8 @@ from esp_idf_monitor.base.gdbhelper import GDBHelper
 from esp_idf_monitor.base.key_config import EXIT_KEY, EXIT_MENU_KEY, MENU_KEY
 from esp_idf_monitor.base.line_matcher import LineMatcher
 from esp_idf_monitor.base.logger import Logger
-from esp_idf_monitor.base.output_helpers import normal_print, yellow_print
+from esp_idf_monitor.base.output_helpers import (normal_print, note_print,
+                                                 warning_print)
 from esp_idf_monitor.base.rom_elf_getter import get_rom_elf_path
 from esp_idf_monitor.base.serial_handler import (SerialHandler,
                                                  SerialHandlerNoElf, run_make)
@@ -171,7 +172,7 @@ class Monitor:
             if os.path.exists(elf_file):
                 exists = True
             else:
-                yellow_print(f"Warning: ELF file '{elf_file}' does not exist")
+                warning_print(f"ELF file '{elf_file}' does not exist")
         return exists
 
     def run_make(self, target: str) -> None:
@@ -191,7 +192,7 @@ class Monitor:
                 try:
                     self._main_loop()
                 except KeyboardInterrupt:
-                    yellow_print(
+                    note_print(
                         f'To exit from IDF monitor please use \"{key_description(EXIT_KEY)}\". '
                         f'Alternatively, you can use {key_description(MENU_KEY)} {key_description(EXIT_MENU_KEY)} to exit.'
                     )
@@ -283,8 +284,8 @@ class SerialMonitor(Monitor):
             self.timeout_cnt = 0
         except serial.SerialTimeoutException:
             if not self.timeout_cnt:
-                yellow_print('Writing to serial is timing out. Please make sure that your application supports '
-                             'an interactive console and that you have picked the correct console for serial communication.')
+                warning_print('Writing to serial is timing out. Please make sure that your application supports '
+                              'an interactive console and that you have picked the correct console for serial communication.')
             self.timeout_cnt += 1
             self.timeout_cnt %= 3
         except serial.SerialException:
@@ -340,7 +341,7 @@ def detect_port() -> Union[str, NoReturn]:
                 if p.device == '/dev/ttyUSB0':
                     port = p.device
                     break
-        yellow_print(f'--- Using autodetected port {port}')
+        note_print(f'Using autodetected port {port}')
         return port
     except IndexError:
         sys.exit('No serial ports detected.')
@@ -378,7 +379,7 @@ def main() -> None:
         if args.target == 'linux':
             serial_instance = None
             cls = LinuxMonitor
-            yellow_print('--- esp-idf-monitor {} on linux ---'.format(__version__))
+            note_print(f'esp-idf-monitor {__version__} on linux')
         else:
             # The port name is changed in cases described in the following lines.
             # Use a local argument and avoid the modification of args.port.
@@ -391,12 +392,12 @@ def main() -> None:
             # number is larger than 10
             if os.name == 'nt' and port.startswith('COM'):
                 port = port.replace('COM', r'\\.\COM')
-                yellow_print('--- WARNING: GDB cannot open serial ports accessed as COMx')
-                yellow_print(f'--- Using {port} instead...')
+                warning_print('GDB cannot open serial ports accessed as COMx')
+                note_print(f'Using {port} instead...')
             elif port.startswith('/dev/tty.') and sys.platform == 'darwin':
                 port = port.replace('/dev/tty.', '/dev/cu.')
-                yellow_print('--- WARNING: Serial ports accessed as /dev/tty.* will hang gdb if launched.')
-                yellow_print(f'--- Using {port} instead...')
+                warning_print('Serial ports accessed as /dev/tty.* will hang gdb if launched.')
+                note_print(f'Using {port} instead...')
 
             serial_instance = serial.serial_for_url(port, args.baud, do_not_open=True, exclusive=True)
             # setting write timeout is not supported for RFC2217 in pyserial
@@ -412,7 +413,7 @@ def main() -> None:
             os.environ.update({ESPPORT_ENVIRON: espport_val, ESPTOOL_OPEN_PORT_ATTEMPTS_ENVIRON: str(args.open_port_attempts)})
 
             cls = SerialMonitor
-            yellow_print('--- esp-idf-monitor {v} on {p.name} {p.baudrate} ---'.format(v=__version__, p=serial_instance))
+            note_print('esp-idf-monitor {v} on {p.name} {p.baudrate}'.format(v=__version__, p=serial_instance))
 
         monitor = cls(serial_instance,
                       args.elf_files,
@@ -434,7 +435,7 @@ def main() -> None:
                       args.disable_auto_color,
                       rom_elf_file)
 
-        yellow_print('--- Quit: {q} | Menu: {m} | Help: {m} followed by {h} ---'.format(
+        note_print('Quit: {q} | Menu: {m} | Help: {m} followed by {h}'.format(
             q=key_description(EXIT_KEY),
             m=key_description(MENU_KEY),
             h=key_description(CTRL_H)))
@@ -443,7 +444,7 @@ def main() -> None:
             # Check if environment variable was used to set print_filter
             if args.print_filter == os.environ.get('ESP_IDF_MONITOR_PRINT_FILTER', None):
                 msg = ' (set with ESP_IDF_MONITOR_PRINT_FILTER environment variable)'
-            yellow_print(f'--- Print filter: "{args.print_filter}"{msg} ---')
+            note_print(f'Print filter: "{args.print_filter}"{msg}')
         Config().load_configuration(verbose=True)
         monitor.main_loop()
     except KeyboardInterrupt:

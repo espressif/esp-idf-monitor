@@ -273,7 +273,7 @@ class TestHost(TestBaseClass):
         with open(err, 'r') as f:
             stderr = f.read()
         # check if monitor is running on RFC2217 port
-        regex = re.compile(rf'--- esp-idf-monitor \d\.\d(\.\d)? on {re.escape(rfc2217)} \d* ---')
+        regex = re.compile(rf'--- esp-idf-monitor \d\.\d(\.\d)? on {re.escape(rfc2217)} \d*')
         assert regex.search(stderr) is not None
         assert 'Exception' not in stderr
         assert 'Stopping condition has been received' in stderr
@@ -295,9 +295,9 @@ class TestHost(TestBaseClass):
 
         with open(err, 'r') as f_err:
             stderr = f_err.read()
-        assert 'Running make app-flash...' in stderr  # Triggered by TA
-        assert 'Running make flash...' in stderr  # TF
-        assert '--- unknown menu character Ctrl+J --' in stderr  # TJ
+        assert '--- Running make app-flash...' in stderr  # Triggered by TA
+        assert '--- Running make flash...' in stderr  # TF
+        assert '--- Error: Unknown menu character Ctrl+J' in stderr  # TJ
 
     @pytest.mark.skipif(os.name == 'nt', reason='Linux/MacOS only')
     def test_log(self):
@@ -381,11 +381,11 @@ class TestConfig(TestBaseClass):
         assert '---    Ctrl+K         Toggle saving output into file' in stderr
         assert 'Ctrl+L' not in stderr
         # make sure that logging was enabled
-        regex = re.compile('Logging is enabled into file (.*\\.txt)')
+        regex = re.compile('--- Logging is enabled into file (.*\\.txt)')
         log_file = regex.search(stderr)
         assert log_file is not None
         # make sure that log file was closed on monitor exit
-        assert f'Logging is disabled and file {log_file.groups()[0]} has been closed' in stderr
+        assert f'--- Logging is disabled and file {log_file.groups()[0]} has been closed' in stderr
 
     def test_skip_menu(self):
         """Run monitor with custom config to skip menu key"""
@@ -402,7 +402,7 @@ class TestConfig(TestBaseClass):
             stderr = f_err.read()
         # make sure that menu was skipped
         assert '--- Using the "skip_menu_key" option from a config file.' in stderr
-        assert 'Running make app-flash...' in stderr  # Triggered by A
+        assert '--- Running make app-flash...' in stderr  # Triggered by A
 
     def test_invalid_custom_config(self):
         # create custom config with unsupported value and unknown key
@@ -494,4 +494,4 @@ class TestConfig(TestBaseClass):
             stderr = f_err.read()
         # check for error message that reset sequence was invalid
         assert f'--- Using custom reset sequence config file: {os.path.join(os.getcwd(), "config.cfg")}' in stderr
-        assert 'Invalid "custom_reset_sequence" option format: \'F\'' in stderr
+        assert '--- Error: Invalid "custom_reset_sequence" option format: \'F\'' in stderr

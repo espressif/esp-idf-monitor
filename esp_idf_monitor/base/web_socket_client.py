@@ -4,7 +4,7 @@
 import json
 import time
 
-from .output_helpers import red_print, yellow_print
+from .output_helpers import error_print, note_print
 
 try:
     import websocket
@@ -48,7 +48,7 @@ class WebSocketClient(object):
             except NameError:
                 raise RuntimeError('Please install the websocket_client package for IDE integration!')
             except Exception as e:  # noqa
-                red_print('WebSocket connection error: {}'.format(e))
+                error_print('WebSocket connection error: {e}')
             time.sleep(self.CONNECTION_RETRY_DELAY)
         else:
             raise RuntimeError('Cannot connect to WebSocket server')
@@ -60,7 +60,7 @@ class WebSocketClient(object):
             # Not yet connected
             pass
         except Exception as e:  # noqa
-            red_print('WebSocket close error: {}'.format(e))
+            error_print('WebSocket close error: {e}')
 
     def send(self, payload_dict):  # type: (dict) -> None
         """
@@ -69,10 +69,10 @@ class WebSocketClient(object):
         for _ in range(self.RETRIES):
             try:
                 self.ws.send(json.dumps(payload_dict))
-                yellow_print('WebSocket sent: {}'.format(payload_dict))
+                note_print(f'WebSocket sent: {payload_dict}')
                 break
             except Exception as e:  # noqa
-                red_print('WebSocket send error: {}'.format(e))
+                error_print(f'WebSocket send error: {e}')
                 self._connect()
         else:
             raise RuntimeError('Cannot send to WebSocket server')
@@ -86,13 +86,13 @@ class WebSocketClient(object):
             try:
                 r = self.ws.recv()
             except Exception as e:
-                red_print('WebSocket receive error: {}'.format(e))
+                error_print(f'WebSocket receive error: {e}')
                 self._connect()
                 continue
             obj = json.loads(r)
             if all([k in obj and obj[k] == v for k, v in expect_iterable]):
-                yellow_print('WebSocket received: {}'.format(obj))
+                note_print(f'WebSocket received: {obj}')
                 break
-            red_print('WebSocket expected: {}, received: {}'.format(dict(expect_iterable), obj))
+            error_print(f'WebSocket expected: {dict(expect_iterable)}, received: {obj}')
         else:
             raise RuntimeError('Cannot receive from WebSocket server')
