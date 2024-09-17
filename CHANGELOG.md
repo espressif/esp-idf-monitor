@@ -1,3 +1,17 @@
+## v1.5.0 (2024-09-17)
+
+### New Features
+
+- add a common prefix for all messages originating from the monitor
+- **esp-idf-monitor**: Add --open-port-attempts flag
+- Add support for multiple ELF files
+- **port_detection**: Filter out BT and WLAN debug serial ports on MacOS
+- added auto color log feature
+
+### Bug Fixes
+
+- improve error message when STDIN in not attached to TTY
+
 ## v1.4.0 (2024-01-30)
 
 ### New Features
