@@ -71,7 +71,7 @@ find = {namespaces = false}
 version = {attr = "esp_idf_monitor.__version__"}
 
 [tool.commitizen]
-version = "1.4.0"
+version = "1.5.0"
 update_changelog_on_bump = true
 tag_format = "v$version"
 changelog_merge_prerelease = true
