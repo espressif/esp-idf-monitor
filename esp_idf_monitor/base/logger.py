@@ -138,9 +138,12 @@ class Logger:
                    f'Type {key_description(MENU_KEY)} {key_description(TOGGLE_OUTPUT_KEY)} '
                    'to show/disable output again.', prefix='\n')
 
-    def handle_possible_pc_address_in_line(self, line: bytes) -> None:
+    def handle_possible_pc_address_in_line(self, line: bytes, insert_new_line: bool = False) -> None:
         if not self.pc_address_decoder:
             return
         translation = self.pc_address_decoder.decode_address(line)
         if translation:
+            if insert_new_line:
+                # insert a new line in case address translation is printed in the middle of a line
+                self.print(b'\n')
             self.print(translation, console_printer=note_print)
