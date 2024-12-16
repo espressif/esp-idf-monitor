@@ -51,7 +51,7 @@ class SerialReader(Reader):
                 self.open_serial(reset=self.reset)
                 # Successfully connected, so any further reconnections should occur without a reset.
                 self.reset = False
-            except serial.SerialException as e:
+            except (serial.SerialException, IOError, OSError) as e:
                 print(e)
                 if self.open_port_attempts == 1:
                     # If the connection to the port fails and --open-port-attempts was not specified,
