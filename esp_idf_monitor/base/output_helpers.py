@@ -44,13 +44,21 @@ def red_print(message: str, newline: Optional[str] = '\n') -> None:
     color_print(message, ANSI_RED, newline)
 
 
+def add_common_prefix(message: str, prefix: str = COMMON_PREFIX) -> str:
+    """Add a common prefix to each line of the message if the line is not empty"""
+    return ''.join(f'{prefix} {line}' if line.strip() else line for line in message.splitlines(keepends=True))
+
+
 def note_print(message: str, newline: Optional[str] = '\n', prefix: str = '') -> None:
-    yellow_print(f'{prefix}{COMMON_PREFIX} {message}', newline=newline)
+    message = add_common_prefix(message)
+    yellow_print(f'{prefix}{message}', newline=newline)
 
 
 def warning_print(message: str, newline: Optional[str] = '\n', prefix: str = '') -> None:
-    yellow_print(f'{prefix}{COMMON_PREFIX} Warning: {message}', newline=newline)
+    message = add_common_prefix(message, prefix=f'{COMMON_PREFIX} Warning:')
+    yellow_print(f'{prefix}{message}', newline=newline)
 
 
 def error_print(message: str, newline: Optional[str] = '\n', prefix: str = '') -> None:
-    red_print(f'{prefix}{COMMON_PREFIX} Error: {message}', newline=newline)
+    message = add_common_prefix(message, prefix=f'{COMMON_PREFIX} Error:')
+    red_print(f'{prefix}{message}', newline=newline)

@@ -34,8 +34,8 @@ def test_monitor_addr_lookup(config: str, coverage_run: List[str], dut: Dut) -> 
         FUNC_NAME = r'[a-zA-Z_][\w]*'
 
         p.expect(re.compile(rf'app_main is running from ({ADDRESS})'))
-        addr = p.match.group(1)
-        p.expect_exact(f'{addr}: app_main at')
+        main_addr = p.match.group(1)
+        p.expect_exact(f'{main_addr}: app_main at')
 
         if config == 'addr_lookup_in_app':
             # reset the app to make sure that the bootloader address is caught
@@ -57,6 +57,13 @@ def test_monitor_addr_lookup(config: str, coverage_run: List[str], dut: Dut) -> 
             match_index = p.expect([str(var1), str(var2), pexpect.TIMEOUT])
             assert match_index == 2  # should be TIMEOUT because addr2line should not match addresses of variables
             p.expect_exact(f'--- {func}: get_random_number at')
+
+            # no new line interleave test
+            p.expect_exact(f'Function pointer at {func}; main at {main_addr}; no new line')  # new line should be inserted here and decode is on separate line
+            # make sure that both decode lines contain the correct prefix
+            p.expect_exact(f'--- {func}: get_random_number at')
+            p.expect_exact(f'--- {main_addr}: app_main at')
+            p.expect_exact('new line now')
 
             p.expect_exact('This is the end of the report')
 

@@ -40,6 +40,12 @@ void app_main(void)
 
     printf("Initializer function at 0x%x\n", (int) initialize);
     printf("Got %d stored at 0x%x and 0x%x from a function from 0x%x\n", *n, (int) n, (int) (&number), (int) get_random_number);
+
+    printf("Function pointer at 0x%x; main at 0x%x; no new line", (int) get_random_number, (int) app_main);
+    fflush(stdout);
+    vTaskDelay(500 / portTICK_PERIOD_MS);
+    printf("new line now\n");
+
     printf("This is the end of the report\n");
 
     free(n);

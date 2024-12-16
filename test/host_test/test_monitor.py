@@ -336,6 +336,15 @@ class TestHost(TestBaseClass):
         assert log_file is not None
         self.filecmp(log_file.groups()[0], out_dir)
 
+    @pytest.mark.skipif(os.name == 'nt', reason='Linux/MacOS only')
+    def test_wrong_elf_file(self):
+        """Run monitor with a path to non-existing ELF file"""
+        # run monitor on empty input
+        out, err = self.run_monitor_async(args=['non_existing.elf'])
+        with open(err, 'r') as f_err:
+            stderr = f_err.read()
+        assert "--- Warning: ELF file 'non_existing.elf' does not exist" in stderr
+
 
 @pytest.mark.skipif(os.name == 'nt', reason='Linux/MacOS only')
 class TestConfig(TestBaseClass):
