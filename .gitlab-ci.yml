@@ -152,7 +152,7 @@ workflow:
     IDF_TARGET: "esp32"
   script:
     # setting PYTHONPATH before running activate script on newest IDF will cause an error because of missing coverage
-    - PYTHONPATH="$PYTHONPATH:${TEST_DIR}"
+    - export PYTHONPATH="$PYTHONPATH:${TEST_DIR}"
     - cd ${TEST_DIR}/test_apps
     - pytest --junit-xml=${TEST_DIR}/results_${IDF_TARGET}_${IDF_BRANCH}.xml --target=${IDF_TARGET}
 
@@ -210,7 +210,7 @@ host_test:
     COVERAGE_PROCESS_START: "${CI_PROJECT_DIR}/pyproject.toml"
   script:
     # setting PYTHONPATH before running activate script on newest IDF will cause an error because of missing coverage
-    - PYTHONPATH="$PYTHONPATH:${TEST_DIR}"
+    - export PYTHONPATH="$PYTHONPATH:${TEST_DIR}"
     - cd ${TEST_DIR}
     - coverage run -m pytest -sv host_test/test_monitor.py
 
@@ -283,7 +283,7 @@ test_linux_apps:
       --manifest-file .build-test-rules.yml
     # setting PYTHONPATH before running build will break the build process
     - cd test_apps
-    - PYTHONPATH=$PYTHONPATH:${TEST_DIR}
+    - export PYTHONPATH=$PYTHONPATH:${TEST_DIR}
     - pytest --junit-xml=${TEST_DIR}/results_${IDF_TARGET}_${IDF_BRANCH}.xml --target=linux
 
 combine_reports:

@@ -186,7 +186,7 @@ class SerialHandler:
         if self._last_line_part != b'' and force_print_or_matched:
             self._force_line_print = True
             self.print_colored(self._last_line_part)
-            self.logger.handle_possible_pc_address_in_line(self._last_line_part)
+            self.logger.handle_possible_pc_address_in_line(self._last_line_part, insert_new_line=True)
             check_gdb_stub_and_run(self._last_line_part)
             # It is possible that the incomplete line cuts in half the PC
             # address. A small buffer is kept and will be used the next time
