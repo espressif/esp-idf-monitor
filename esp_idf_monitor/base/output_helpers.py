@@ -17,7 +17,7 @@ ANSI_GREEN_B = ANSI_GREEN.encode()
 ANSI_YELLOW_B = ANSI_YELLOW.encode()
 ANSI_NORMAL_B = ANSI_NORMAL.encode()
 
-AUTO_COLOR_REGEX = re.compile(rb'^(I|W|E) \(\d+\)')
+AUTO_COLOR_REGEX = re.compile(rb'^(I|W|E) \([\d:\. -]+\)')
 
 COMMON_PREFIX = '---'
 
