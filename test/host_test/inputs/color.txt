@@ -3,8 +3,12 @@ D (120) debug: Debug message
 I (578) main_task: Started on CPU0
 W (470) spi_flash: Detected size(4096k)
 E (623) foo: This is an example error
+I (00:00:00.100) bar: This is an example with system time
+I (20-02-02 00:00:00.100) baz: This is an example with system datetime
 Hello world!
 Already colored
 [0;32mI (578) main_task: Started on CPU0[0m
 [0;33mW (470) spi_flash: Detected size(4096k)[0m
 [1;31mE (623) foo: This is an example error[0m
+[0;32mI (00:00:00.100) bar: This is an example with system time[0m
+[0;32mI (20-02-02 00:00:00.100) baz: This is an example with system datetime[0m
