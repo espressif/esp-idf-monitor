@@ -9,7 +9,7 @@ from typing import Generator, List, Optional  # noqa: F401
 
 from .constants import TAG_KEY
 from .logger import Logger  # noqa: F401
-from .output_helpers import note_print, warning_print
+from .output_helpers import error_print, note_print, warning_print
 from .web_socket_client import WebSocketClient  # noqa: F401
 
 # coredump related messages
@@ -65,14 +65,6 @@ class CoreDump:
         else:
             try:
                 import esp_coredump
-            except ImportError as e:
-                warning_print('Failed to parse core dump info: '
-                              f'Module {e.name} is not installed\n\n')
-                self.logger.output_enabled = True
-                self.logger.print(COREDUMP_UART_START + b'\n')
-                self.logger.print(self._coredump_buffer)
-                # end line will be printed in handle_serial_input
-            else:
                 coredump = esp_coredump.CoreDump(core=coredump_file.name, core_format='b64', prog=self.elf_files)
                 f = io.StringIO()
                 with redirect_stdout(f):
@@ -81,11 +73,26 @@ class CoreDump:
                 self.logger.output_enabled = True
                 self.logger.print(output.encode('utf-8'))
                 self.logger.output_enabled = False  # Will be re-enabled in check_coredump_trigger_after_print
+            except ImportError as e:
+                warning_print('Failed to parse core dump info: '
+                              f'Module {e.name} is not installed\n\n')
+                self._print_unprocessed_coredump()
+            except (Exception, SystemExit) as e:
+                error_print(f'Failed to parse core dump info: {e}\n\n')
+                self._print_unprocessed_coredump()
+
         if coredump_file is not None:
             try:
                 os.unlink(coredump_file.name)
             except OSError as e:
                 warning_print(f'Couldn\'t remote temporary core dump file ({e})')
+
+    def _print_unprocessed_coredump(self) -> None:
+        """Print unprocessed core dump data if there was any issue during processing."""
+        self.logger.output_enabled = True
+        self.logger.print(COREDUMP_UART_START + b'\n')
+        self.logger.print(self._coredump_buffer)
+        # end line will be printed in handle_serial_input
 
     def _check_coredump_trigger_before_print(self, line):  # type: (bytes) -> None
         if self._decode_coredumps == COREDUMP_DECODE_DISABLE:
