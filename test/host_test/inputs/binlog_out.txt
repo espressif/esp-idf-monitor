@@ -1,0 +1,131 @@
+Serial port /dev/ttyUSB0
+Connecting....
+ets Jul 29 2019 12:21:46
+
+rst:0x1 (POWERON_RESET),boot:0x13 (SPI_FAST_FLASH_BOOT)
+configsip: 0, SPIWP:0xee
+clk_drv:0x00,q_drv:0x00,d_drv:0x00,cs0_drv:0x00,hd_drv:0x00,wp_drv:0x00
+mode:DIO, clock div:2
+load:0x3fff0040,len:2524
+ho 0 tail 12 room 4
+load:0x40078000,len:17096
+ho 0 tail 12 room 4
+load:0x40080400,len:3860
+entry 0x4008068c
+[0;32mI (31) boot: ESP-IDF v5.5-dev-2410-g306d67599fd-dirt 2nd stage bootloader[0m
+[0;32mI (31) boot: compile time Mar 20 2025 11:15:24[0m
+[0;32mI (31) boot: Multicore bootloader[0m
+[0;32mI (32) boot: chip revision: v3.0[0m
+[0;32mI (32) boot.esp32: SPI Speed      : 40MHz[0m
+[0;32mI (35) boot.esp32: SPI Mode       : DIO[0m
+[0;32mI (38) boot.esp32: SPI Flash Size : 2MB[0m
+[0;32mI (40) boot: Enabling RNG early entropy source...[0m
+[0;32mI (42) boot: Partition Table:[0m
+[0;32mI (43) boot: ## Label            Usage          Type ST Offset   Length[0m
+[0;32mI (45) boot:  0 nvs              WiFi data        01 02 00009000 00006000[0m
+[0;32mI (49) boot:  1 phy_init         RF data          01 01 0000f000 00001000[0m
+[0;32mI (54) boot:  2 factory          factory app      00 00 00010000 00100000[0m
+[0;32mI (60) boot: End of partition table[0m
+[0;32mI (61) esp_image: segment 0: paddr=00010020 vaddr=3f400020 size=06a2ch ( 27180) map[0m
+[0;32mI (75) esp_image: segment 1: paddr=00016a54 vaddr=3ff80000 size=0001ch (    28) load[0m
+[0;32mI (75) esp_image: segment 2: paddr=00016a78 vaddr=3ffb0000 size=02050h (  8272) load[0m
+[0;32mI (78) esp_image: segment 3: paddr=00018ad0 vaddr=40080000 size=07548h ( 30024) load[0m
+[0;32mI (90) esp_image: segment 4: paddr=00020020 vaddr=400d0020 size=0ff14h ( 65300) map[0m
+[0;32mI (113) esp_image: segment 5: paddr=0002ff3c vaddr=40087548 size=05858h ( 22616) load[0m
+[0;32mI (128) boot: Loaded app from partition at offset 0x10000[0m
+[0;32mI (129) boot: Disabling RNG early entropy source...[0m
+[0;32mI (133) cpu_start: Multicore app[0m
+[0;32mI (141) cpu_start: Pro cpu start user code[0m
+[0;32mI (141) cpu_start: cpu freq: 160000000 Hz[0m
+[0;32mI (141) app_init: Application information:[0m
+[0;32mI (141) app_init: Project name:     log[0m
+[0;32mI (141) app_init: App version:      v5.5-dev-2410-g306d67599fd-dirt[0m
+[0;32mI (141) app_init: Compile time:     Mar 20 2025 11:15:15[0m
+[0;32mI (141) app_init: ELF file SHA256:  5cd3b3293...[0m
+[0;32mI (142) app_init: ESP-IDF:          v5.5-dev-2410-g306d67599fd-dirt[0m
+[0;32mI (144) efuse_init: Min chip rev:     v0.0[0m
+[0;32mI (146) efuse_init: Max chip rev:     v3.99 [0m
+[0;32mI (148) efuse_init: Chip rev:         v3.0[0m
+[0;32mI (151) heap_init: Initializing. RAM available for dynamic allocation:[0m
+[0;32mI (152) heap_init: At 3FFAE6E0 len 00001920 (6 KiB): DRAM[0m
+[0;32mI (155) heap_init: At 3FFB28A8 len 0002D758 (181 KiB): DRAM[0m
+[0;32mI (158) heap_init: At 3FFE0440 len 00003AE0 (14 KiB): D/IRAM[0m
+[0;32mI (160) heap_init: At 3FFE4350 len 0001BCB0 (111 KiB): D/IRAM[0m
+[0;32mI (163) heap_init: At 4008CDA0 len 00013260 (76 KiB): IRAM[0m
+[0;32mI (167) spi_flash: detected chip: generic[0m
+[0;32mI (169) spi_flash: flash io: dio[0m
+[0;33mW (171) spi_flash: Detected size(4096k) larger than the size in the binary image header(2048k). Using the size in the binary image header.[0m
+[0;32mI (174) main_task: Started on CPU0[0m
+[0;32mI (184) main_task: Calling app_main()[0m
+[0;32mI (184) example: Start[0m
+[0;32mI (184) example: char_var A 0x41[0m
+[0;32mI (184) example: var8 240 -120[0m
+[0;32mI (184) example: var16 65303 -16954 0xff17[0m
+[0;32mI (184) example: const int var -1024[0m
+[0;32mI (184) example: const long long unsigned var 2095[0m
+[0;32mI (184) example: int_var 4095 -4095[0m
+[0;32mI (184) example: var32 9000 -2000[0m
+[0;32mI (194) example: var64 10700 -29468[0m
+[0;32mI (194) example: 64 32 64 vars 10700 9000 10800[0m
+[0;32mI (194) example: var_size 96843 4[0m
+[0;32mI (194) example: float var 1.600000[0m
+[0;32mI (204) example: double var -70.199997[0m
+[0;32mI (204) example: int, double, var32, float, float, char 4095 -70.199997 9000 1.600000 1.600000 A[0m
+[0;32mI (204) example: str_array 0x3ffb3a20[0m
+[0;32mI (214) example: str_ptr 0x3f402b38[0m
+[0;32mI (214) example: 00 01 02 03 04 05 06 07 08 09 0a 0b 0c 0d 0e 0f[0m
+[0;32mI (214) example: 10 11 12 13 14 15 16 17 18 19 1a 1b 1c 1d 1e 1f[0m
+[0;32mI (214) example: 20 21 21 21 21 21 21 21 21 21 21 21 21 21 21 21[0m
+[0;32mI (214) example: 30 31 32 33 34 35 36 37 38 39 30 31 32 33 34 35[0m
+[0;32mI (214) example: 40 41 42 43 44 45 46 47 48 49 4a 4b 4c 4d 4e 4f[0m
+[0;32mI (214) example: 50 51 52 53 54 55 56 57 58 59[0m
+[0;32mI (224) example: 0x3ffb3a2a   00 01 02 03 04 05 06 07  08 09 0A 0B 0C 0D 0E 0F  |................|[0m
+[0;32mI (224) example: 0x3ffb3a3a   10 11 12 13 14 15 16 17  18 19 1A 1B 1C 1D 1E 1F  |................|[0m
+[0;32mI (224) example: 0x3ffb3a4a   20 21 21 21 21 21 21 21  21 21 21 21 21 21 21 21  | !!!!!!!!!!!!!!!|[0m
+[0;32mI (224) example: 0x3ffb3a5a   30 31 32 33 34 35 36 37  38 39 30 31 32 33 34 35  |0123456789012345|[0m
+[0;32mI (224) example: 0x3ffb3a6a   40 41 42 43 44 45 46 47  48 49 4A 4B 4C 4D 4E 4F  |@ABCDEFGHIJKLMNO|[0m
+[0;32mI (224) example: 0x3ffb3a7a   50 51 52 53 54 55 56 57  58 59                    |PQRSTUVWXY|[0m
+[0;32mI (234) example: Text1:The way to[0m
+[0;32mI (234) example:  get started is [0m
+[0;32mI (234) example: to quit talking [0m
+[0;32mI (234) example: and begin doing.[0m
+[0;32mI (234) example:  - Walt Disney[0m
+[0;32mI (244) example: Text2:The way to[0m
+[0;32mI (244) example:  get started is [0m
+[0;32mI (244) example: to quit talking [0m
+[0;32mI (244) example: and begin doing.[0m
+[0;32mI (244) example:  - Walt Disney[0m
+[0;32mI (244) example: buffer2 0x3ffb3ad4[0m
+[0;32mI (244) example: 0x3ffb3ad4   00 00 00 00 01 00 00 00  02 00 00 00 03 00 00 00  |................|[0m
+[0;32mI (244) example: 0x3ffb3ae4   04 00 00 00 05 00 00 00  06 00 00 00 07 00 00 00  |................|[0m
+[0;32mI (244) example: 0x3ffb3af4   08 00 00 00 09 00 00 00  0A 00 00 00 0B 00 00 00  |................|[0m
+[0;32mI (244) example: 0x3ffb3b04   0C 00 00 00 0D 00 00 00  0E 00 00 00 0F 00 00 00  |................|[0m
+[0;32mI (244) example: 0x3ffb3b14   10 00 00 00 11 00 00 00  12 00 00 00 13 00 00 00  |................|[0m
+[0;32mI (254) example: buffer3 0x3ffb3b28[0m
+[0;32mI (254) example: 0x3ffb3b28   00 00 00 00 00 00 00 00  01 00 00 00 00 00 00 00  |................|[0m
+[0;32mI (254) example: 0x3ffb3b38   02 00 00 00 00 00 00 00  03 00 00 00 00 00 00 00  |................|[0m
+[0;32mI (254) example: 0x3ffb3b48   04 00 00 00 00 00 00 00  05 00 00 00 00 00 00 00  |................|[0m
+[0;32mI (254) example: 0x3ffb3b58   06 00 00 00 00 00 00 00  07 00 00 00 00 00 00 00  |................|[0m
+[0;32mI (254) example: 0x3ffb3b68   08 00 00 00 00 00 00 00  09 00 00 00 00 00 00 00  |................|[0m
+[0;32mI (254) example: 0x3ffb3b78   0A 00 00 00 00 00 00 00                           |........|[0m
+[0;32mI (264) example: Precision and Width Tests[0m
+[0;32mI (274) example: int width |   42| |00042| |42   |[0m
+[0;32mI (274) example: int precision |   42| |00042| |00042|[0m
+[0;32mI (274) example: float width |  3.141590| |3.141590  | |3.141590|[0m
+[0;32mI (274) example: double width |-123.456789| |-123.456789| |-123.456789|[0m
+[0;32mI (284) example: string width |ESP32     | |ESP32     | |ESP32 Test|[0m
+[0;32mI (284) example: longs |1234567890| |123456789012345|[0m
+[0;32mI (284) example: shorts |ffff| |ff|[0m
+[0;32mI (294) example: Precision and Width Tests Complete[0m
+[0;32mI (294) example: Flag and Specifier Tests[0m
+[0;32mI (294) example: + flag |+42| |-42|[0m
+[0;32mI (294) example:   flag | 42| |-42|[0m
+[0;32mI (294) example: # flag |0xff| |0XFF| |0377|[0m
+[0;32mI (304) example: # flag long |0x499602d2| |011145401322|[0m
+[0;32mI (304) example: Octal format |377| |0377|[0m
+[0;32mI (304) example: Octal short |777| |0777|[0m
+[0;32mI (304) example: Combined Flags |       +42| |        42| |      0x2a| |       052|[0m
+[0;32mI (314) example: Left-aligned Combined Flags |+42       | | 42       | |0x2a      | |052       |[0m
+[0;32mI (314) example: Flag and Specifier Tests Complete[0m
+[0;32mI (314) example: Success[0m
+[0;32mI (314) main_task: Returned from app_main()[0m

@@ -1,4 +1,4 @@
-# SPDX-FileCopyrightText: 2015-2023 Espressif Systems (Shanghai) CO LTD
+# SPDX-FileCopyrightText: 2015-2025 Espressif Systems (Shanghai) CO LTD
 # SPDX-License-Identifier: Apache-2.0
 
 import hashlib
@@ -12,6 +12,7 @@ import serial  # noqa: F401
 from esp_idf_panic_decoder import PanicOutputDecoder
 from serial.tools import miniterm  # noqa: F401
 
+from .binlog import BinaryLog
 from .console_parser import (ConsoleParser, key_description,  # noqa: F401
                              prompt_next_action)
 from .console_reader import ConsoleReader  # noqa: F401
@@ -84,21 +85,35 @@ class SerialHandler:
         self.reset = Reset(serial_instance, target)
         self.panic_handler = PanicOutputDecoder(toolchain_prefix, elf_files, target)
         self.disable_auto_color = disable_auto_color
+        self.binlog = BinaryLog(elf_files)
+        self.binary_log_detected = False
 
     def splitdata(self, data):  # type: (bytes) -> List[bytes]
         """
         Split data into lines, while keeping newlines, and move unfinished line for future processing
         """
         # if data is empty fallback to empty string for easier concatenation with last line
-        sp = data.splitlines(keepends=True) or [b'']
-        if self._last_line_part != b'':
-            # add unprocessed part from previous "data" to the first line
-            sp[0] = self._last_line_part + sp[0]
-            self._last_line_part = b''
-        if not sp[-1].endswith(b'\n'):
-            # last part is not a full line
-            self._last_line_part = sp.pop()
-        return sp
+        self.binary_log_detected = (
+            self.binlog.detected(self._last_line_part[0])
+            if self._last_line_part
+            else self.binlog.detected(data[0]) if data
+            else False
+        )
+        if self.binary_log_detected:
+            if self._last_line_part != b'':
+                data = self._last_line_part + data
+                self._last_line_part = b''
+            return [data]
+        else:
+            sp = data.splitlines(keepends=True) or [b'']
+            if self._last_line_part != b'':
+                # add unprocessed part from previous "data" to the first line
+                sp[0] = self._last_line_part + sp[0]
+                self._last_line_part = b''
+            if not sp[-1].endswith(b'\n'):
+                # last part is not a full line
+                self._last_line_part = sp.pop()
+            return sp
 
     def print_colored(self, line: bytes) -> None:
         if self.disable_auto_color:
@@ -148,6 +163,12 @@ class SerialHandler:
                 data = data[(pos + 1):]
 
         sp = self.splitdata(data)
+        if self.binary_log_detected:
+            text_lines, self._last_line_part = self.binlog.convert_to_text(sp[0])
+            for line in text_lines:
+                self.print_colored(line)
+            return
+
         for line in sp:
             line_strip = line.strip()
             if self._serial_check_exit and line_strip == EXIT_KEY.encode('latin-1'):
