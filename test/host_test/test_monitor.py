@@ -345,6 +345,23 @@ class TestHost(TestBaseClass):
             stderr = f_err.read()
         assert "--- Warning: ELF file 'non_existing.elf' does not exist" in stderr
 
+    def test_binary_logging(self):
+        args = [IN_DIR + '/log.elf', IN_DIR + '/bootloader.elf']
+        out, err = self.run_monitor(args, 'binlog', timeout=10)
+        with open(err, 'r') as f_err:
+            stderr = f_err.read()
+            assert 'Stopping condition has been received' in stderr
+
+        ansi_regex = re.compile(r'\x1B\[\d+(;\d+){0,2}m')
+        with open(out, 'r') as f_out, open(os.path.join(IN_DIR, 'binlog_out.txt'), 'r') as f_expected:
+            for line_out, line_expected in zip(f_out, f_expected):
+                if os.name == 'nt':
+                    line_expected = ansi_regex.sub('', line_expected)
+                    line_out = ansi_regex.sub('', line_out)
+                line_out = line_out.strip()
+                line_expected = line_expected.strip()
+                assert line_out == line_expected, f'Mismatch: {line_out} != {line_expected}'
+
 
 @pytest.mark.skipif(os.name == 'nt', reason='Linux/MacOS only')
 class TestConfig(TestBaseClass):
