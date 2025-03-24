@@ -1,3 +1,19 @@
+## v1.6.0 (2025-03-24)
+
+### New Features
+
+- **binlog**: Support binary log format expansion in monitor
+- add support for new roms.json location
+
+### Bug Fixes
+
+- Catch all exceptions from esp-coredump package to avoid exiting monitor
+- handle port disappear immediately after open
+- Auto color for alternative timestamp formats
+- Use absolute import in __main__ for pyinstaller/pyinstaller#2560
+- include common prefix for each line in multiline string
+- prevent address decode interleave with serial output
+
 ## v1.5.0 (2024-09-17)
 
 ### New Features
