@@ -2,28 +2,13 @@
 # SPDX-License-Identifier: Apache-2.0
 
 import re
+import string
 import struct
 from typing import Any, List, Optional, Tuple, Union
 
 from elftools.elf.elffile import ELFFile
 
 from .output_helpers import warning_print
-
-# Examples of format:
-# %d        - specifier='d'
-# %10d      - width='10', specifier='d'
-# %-5.2f    - flags='-', width='5', precision='2', specifier='f'
-# %#08x     - flags='#0', width='8', specifier='x'
-# %llX      - length='ll', specifier='X'
-# %zu       - length='z', specifier='u'
-# %p        - specifier='p'
-PRINTF_FORMAT_REGEX = re.compile(
-    r'%(?P<flags>[-+0# ]*)?'        # (1) Flags: Optional, can include '-', '+', '0', '#', or ' ' (space)
-    r'(?P<width>\*|\d+)?'           # (2) Width: Optional, specifies minimum field width (e.g., "10" in "%10d")
-    r'(\.(?P<precision>\*|\d+))?'   # (3) Precision: Optional, starts with '.', followed by digits (e.g., ".2" in "%.2f")
-    r'(?P<length>hh|h|l|ll|z|j|t|L)?'  # (4) Length Modifier: Optional (e.g., "ll" in "%lld", "z" in "%zu")
-    r'(?P<specifier>[diuoxXfFeEgGaAcsp])'  # (5) Specifier: Required (e.g., "d" for integers, "s" for strings)
-)
 
 
 class Control:
@@ -129,11 +114,14 @@ class Message:
         args: List[Union[int, str, float, bytes]] = []
         i_str = 0
         i_arg = 0
+        arg_formatter = ArgFormatter()
         while i_str < len(format):
-            match = PRINTF_FORMAT_REGEX.search(format, i_str)
+            match = arg_formatter.c_format_regex.search(format, i_str)
             if not match:
                 break
             i_str = match.end()
+            if match.group(0) == '%%':
+                continue
             length = match.group('length') or ''
             specifier = match.group('specifier')
 
@@ -263,79 +251,8 @@ class BinaryLog:
                 messages.append(self.format_message(msg))
         return messages, incomplete_fragment
 
-    @staticmethod
-    def convert_c_format_to_pythonic(fmt: str) -> str:
-        """Convert C printf-style % formatting to Python {} formatting using a common regex."""
-
-        def replace_match(m):
-            """Helper function to convert printf specifiers to Python format."""
-            flags = m.group('flags') or ''
-            width = m.group('width') or ''
-            precision = m.group('precision') or ''
-            specifier = m.group('specifier')
-
-            # Convert printf flags to Python equivalents
-            python_flags = ''
-            if '-' in flags:
-                python_flags += '<'   # Left-align
-            elif '0' in flags:
-                python_flags += '0'   # Zero-padding
-            if '+' in flags:
-                python_flags += '+'   # Force sign
-            elif ' ' in flags:
-                python_flags += ' '   # Space before positive numbers
-            if '#' in flags and specifier in 'oxX':  # Ensure correct alternate form
-                python_flags += '#'
-                if width and specifier == 'o':  # If width is specified, increase it by 1 to compensate for `0o` -> `0`
-                    width = str(int(width) + 1)
-
-            # Convert precision for integers (`%.5d` -> `{:05d}`)
-            if precision and specifier in 'diouxX':
-                width = precision  # Precision becomes width for zero-padding
-                python_flags = '0'  # Force zero-padding
-                precision = None    # Remove precision (Python does not support it for ints)
-
-            # Handle width (`*` becomes `{}` placeholder)
-            width_placeholder = '*' if width == '*' else width
-
-            # Convert specifier
-            python_specifier = specifier
-            if specifier in 'diu':   # Integer
-                python_specifier = 'd'
-            elif specifier in 'o':   # Octal
-                python_specifier = 'o'
-            elif specifier in 'xX':  # Hexadecimal
-                python_specifier = 'x' if specifier == 'x' else 'X'
-            elif specifier in 'fFeEgGaA':  # Floating-point
-                python_specifier = specifier.lower()
-            elif specifier in 'c':   # Character
-                python_specifier = 's'  # Convert `%c` to `{s}` (needs manual conversion)
-            elif specifier in 's':   # String
-                python_specifier = 's'
-            elif specifier in 'p':   # Pointer
-                python_specifier = '#x'
-
-            # Construct final Python format specifier
-            python_format = '{:' + python_flags
-            if width_placeholder:
-                python_format += width_placeholder
-            python_format += python_specifier + '}'
-
-            return python_format
-
-        # Convert printf format specifiers to Python format specifiers
-        return PRINTF_FORMAT_REGEX.sub(replace_match, fmt)
-
-    @staticmethod
-    def post_process_pythonic_format(formatted_message: str) -> str:
-        """Fix specific formatting issues after conversion."""
-        # Fix octal formatting (`0o377` → `0377`)
-        formatted_message = formatted_message.replace('0o', '0')
-        return formatted_message
-
     def format_message(self, message: Message) -> bytes:
-        text_msg = self.convert_c_format_to_pythonic(message.format).format(*message.args)
-        text_msg = self.post_process_pythonic_format(text_msg)
+        text_msg = ArgFormatter().c_format(message.format, message.args)
         level_name = {1: 'E', 2: 'W', 3: 'I', 4: 'D', 5: 'V'}[message.control.level]
         return f'{level_name} ({message.timestamp}) {message.tag}: {text_msg}\n'.encode('ascii')
 
@@ -371,7 +288,7 @@ class BinaryLog:
             # I (1024) log_example: 0x3ffb5bd0   74 61 72 74 65 64 20 69  73 20 74 6f 20 71 75 69  |tarted is to qui|
             while buff_len > 0:
                 tmp_len = min(BYTES_PER_LINE, buff_len)
-                hex_part = ' '.join(f'{b:02X}' for b in buffer[:tmp_len])
+                hex_part = ' '.join(f'{b:02x}' for b in buffer[:tmp_len])
                 hex_part_split = ' '.join([hex_part[:24], hex_part[24:]])
                 char_part = ''.join(chr(b) if 32 <= b < 127 else '.' for b in buffer[:tmp_len])
                 message.format = f'0x{buffer_addr:08x}   {hex_part_split:<48}  |{char_part}|'
@@ -381,3 +298,117 @@ class BinaryLog:
                 buff_len -= tmp_len
 
         return text_msg
+
+
+class ArgFormatter(string.Formatter):
+    def __init__(self) -> None:
+        # Examples of format:
+        # %d        - specifier='d'
+        # %10d      - width='10', specifier='d'
+        # %-5.2f    - flags='-', width='5', precision='2', specifier='f'
+        # %#08x     - flags='#0', width='8', specifier='x'
+        # %llX      - length='ll', specifier='X'
+        # %zu       - length='z', specifier='u'
+        # %p        - specifier='p'
+        self.c_format_regex = re.compile(
+            r'%%|'                          # (0) Match literal %%
+            r'%(?P<flags>[-+0# ]*)?'        # (1) Flags: Optional, can include '-', '+', '0', '#', or ' ' (space)
+            r'(?P<width>\*|\d+)?'           # (2) Width: Optional, specifies minimum field width (e.g., "10" in "%10d")
+            r'(\.(?P<precision>\*|\d+))?'   # (3) Precision: Optional, starts with '.', followed by digits (e.g., ".2" in "%.2f")
+            r'(?P<length>hh|h|l|ll|z|j|t|L)?'  # (4) Length Modifier: Optional (e.g., "ll" in "%lld", "z" in "%zu")
+            r'(?P<specifier>[diuoxXfFeEgGaAcsp])'  # (5) Specifier: Required (e.g., "d" for integers, "s" for strings)
+        )
+
+    def format_field(self, value: Any, format_spec: str) -> Any:
+        if 'o' in format_spec and '#' in format_spec:
+            # Fix octal formatting (`0o377` → `0377`)
+            value = '0' + format(value, 'o')  # Correct prefix for C-style octal
+            format_spec = format_spec.replace('o', 's').replace('#', '')  # Remove '#' and replace 'o' with 's'
+            format_spec = ('>' if '<' not in format_spec else '') + format_spec
+        return super().format_field(value, format_spec)
+
+    def convert_to_pythonic_format(self, match: re.Match) -> str:
+        """Convert C-style format to Python-style and return the Python-style format string."""
+        if not match:
+            return ''
+        if match.group(0) == '%%':
+            return '%'
+        flags, width, precision, specifier = (
+            match.group('flags') or '',
+            match.group('width') or '',
+            match.group('precision') or '',
+            match.group('specifier'),
+        )
+
+        # Convert C-style flags to Python equivalents
+        py_flags = self.convert_flags(flags, specifier)
+        py_precision = ''
+        if precision:
+            # Convert precision for integers (`%.5d` -> `{:05d}`)
+            if specifier in 'diouxX':
+                width = precision  # Precision becomes width for zero-padding
+                py_flags = '0'     # Force zero-padding
+                precision = None   # Remove precision (Python does not support it for ints)
+            else:
+                py_precision = '.' + precision
+        py_specifier = self.convert_specifier(specifier)
+        py_width = width
+
+        # Build Python format specifier
+        return '{:' + py_flags + py_width + py_precision + py_specifier + '}'
+
+    def convert_flags(self, flags: str, specifier: str) -> str:
+        """Convert C-style flags to Python format specifier flags."""
+        py_flags = ''
+        if specifier in 'sS':  # String
+            if '-' not in flags:
+                py_flags += '>'
+        if '-' in flags:
+            py_flags += '<'  # Left-align
+        elif '0' in flags:
+            py_flags += '0'  # Zero-padding
+        if '+' in flags:
+            py_flags += '+'  # Force sign
+        elif ' ' in flags:
+            py_flags += ' '  # Space before positive numbers
+        if '#' in flags and specifier in 'oxX':  # Alternate form for octal/hex
+            py_flags += '#'
+
+        return py_flags
+
+    def convert_specifier(self, specifier: str) -> str:
+        """Convert C-style specifier to Python equivalent."""
+        if specifier in 'diu':
+            return 'd'
+        elif specifier == 'o':
+            return 'o'
+        elif specifier in 'xX':
+            return 'x' if specifier == 'x' else 'X'
+        elif specifier in 'fFeEgGaA':
+            return specifier
+        elif specifier == 'c':  # Characters treated as string
+            return 's'
+        elif specifier in 'sS':
+            return 's'
+        elif specifier == 'p':
+            return '#x'
+        else:
+            raise ValueError(f'Unsupported format specifier: {specifier}')
+
+    def c_format(self, fmt: str, args: Any) -> str:
+        """Format a C-style string using Python's format method."""
+        result_parts = []
+        i_str = 0
+        i_arg = 0
+        while i_str < len(fmt):
+            match = self.c_format_regex.search(fmt, i_str)
+            if not match:
+                break
+            py_format = self.convert_to_pythonic_format(match)
+            formatted_str = self.format(py_format, args[i_arg] if args else None)  # This will call format_field()
+            i_arg += 1 if match.group(0) != '%%' else 0
+            result_parts.append(fmt[i_str:match.start()] + formatted_str)
+            i_str = match.end()
+        # Add remaining part of the string after last match
+        result_parts.append(fmt[i_str:])
+        return ''.join(result_parts)

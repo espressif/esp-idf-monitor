@@ -521,3 +521,96 @@ class TestConfig(TestBaseClass):
         # check for error message that reset sequence was invalid
         assert f'--- Using custom reset sequence config file: {os.path.join(os.getcwd(), "config.cfg")}' in stderr
         assert '--- Error: Invalid "custom_reset_sequence" option format: \'F\'' in stderr
+
+
+class TestCStyleConversion(TestBaseClass):
+    """Test C-style conversion"""
+
+    @pytest.mark.parametrize(
+        'c_fmt, arg, pythonic_fmt, output',
+        [
+            # String formatting
+            ('|%s|', 'Hello_world', '{:>s}', '|Hello_world|'),
+            ('|%10s|', 'ESP32', '{:>10s}', '|     ESP32|'),
+            ('|%-10s|', 'ESP32', '{:<10s}', '|ESP32     |'),
+            ('|%.5s|', 'Hello_world', '{:>.5s}', '|Hello|'),
+
+            # Character formatting
+            ('|%c|', chr(65), '{:s}', '|A|'),
+
+            # Integer formatting
+            ('|%d|', 123, '{:d}', '|123|'),
+            ('|%5d|', 42, '{:5d}', '|   42|'),
+            ('|%05d|', 42, '{:05d}', '|00042|'),
+            ('|%-5d|', 42, '{:<5d}', '|42   |'),
+            ('|%.5d|', 42, '{:05d}', '|00042|'),
+            ('|%+d|', 42, '{:+d}', '|+42|'),
+            ('|% d|', 42, '{: d}', '| 42|'),
+            ('|%ld|', 123456789, '{:d}', '|123456789|'),
+            ('|%lld|', 1234567890123456789, '{:d}', '|1234567890123456789|'),
+            ('|%#d|', 123456789, '{:d}', '|123456789|'),
+            ('|%+10d|', 42, '{:+10d}', '|       +42|'),
+            ('|% 10d|', 42, '{: 10d}', '|        42|'),
+            ('|%-+10d|', 42, '{:<+10d}', '|+42       |'),
+            ('|%- 10d|', 42, '{:< 10d}', '| 42       |'),
+
+            # Pointer formatting
+            ('|%p|', 0x3ff26523, '{:#x}', '|0x3ff26523|'),
+
+            # Hexadecimal formatting
+            ('|%x|', 255, '{:x}', '|ff|'),
+            ('|%X|', 255, '{:X}', '|FF|'),
+            ('|%05x|', 255, '{:05x}', '|000ff|'),
+            ('|%.5x|', 255, '{:05x}', '|000ff|'),
+            ('|%-5x|', 255, '{:<5x}', '|ff   |'),
+            ('|%+x|', 42, '{:+x}', '|+2a|'),
+            ('|% x|', 42, '{: x}', '| 2a|'),
+            ('|%hx|', 0xFFFF, '{:x}', '|ffff|'),
+            ('|%hhx|', 0xFF, '{:x}', '|ff|'),
+            ('|%#x|', 42, '{:#x}', '|0x2a|'),
+            ('|%#X|', 255, '{:#X}', '|0XFF|'),
+            ('|%#10x|', 42, '{:#10x}', '|      0x2a|'),
+            ('|%-#10x|', 42, '{:<#10x}', '|0x2a      |'),
+
+            # Octal formatting
+            ('|%o|', 8, '{:o}', '|10|'),
+            ('|%#o|', 8, '{:#o}', '|010|'),
+            ('|%ho|', 511, '{:o}', '|777|'),
+            ('|%#ho|', 511, '{:#o}', '|0777|'),
+            ('|%#10o|', 42, '{:#10o}', '|       052|'),
+            ('|%-#10o|', 42, '{:<#10o}', '|052       |'),
+
+            # Float formatting
+            ('|%f|', 123.456, '{:f}', '|123.456000|'),
+            ('|%.2f|', 123.456, '{:.2f}', '|123.46|'),
+            ('|%.2f|', -123.456, '{:.2f}', '|-123.46|'),
+            ('|%10.2f|', 3.14159, '{:10.2f}', '|      3.14|'),
+            ('|%-10.2f|', 3.14159, '{:<10.2f}', '|3.14      |'),
+            ('|%10.6f|', -123.45678933, '{:10.6f}', '|-123.456789|'),
+            ('|%-10.6f|', -123.45678933, '{:<10.6f}', '|-123.456789|'),
+
+            # Scientific float formatting
+            ('|%F|', 123456.789, '{:F}', '|123456.789000|'),
+            ('|%e|', 123456.789, '{:e}', '|1.234568e+05|'),
+            ('|%E|', 123456.789, '{:E}', '|1.234568E+05|'),
+            ('|%g|', 123456.789, '{:g}', '|123457|'),
+            ('|%G|', 123456.789, '{:G}', '|123457|'),
+
+            # Literal percent sign
+            ('|%%|', '', '%', '|%|'),
+            ('|%%| |%s|', 'Hello_world', '%', '|%| |Hello_world|'),
+
+            # } character in c-style format does not break pythonic format conversion
+            ('} |%s|', 'Hello_world', '{:>s}', '} |Hello_world|'),
+        ],
+    )
+    def test_c_format(self, c_fmt, arg, pythonic_fmt, output):
+        """Test ArgFormatter.c_format with various format strings and arguments"""
+        from esp_idf_monitor.base import ArgFormatter
+        formatter = ArgFormatter()
+        converted_format = formatter.convert_to_pythonic_format(formatter.c_format_regex.search(c_fmt))
+        assert converted_format == pythonic_fmt, (
+            f"Expected Pythonic format '{pythonic_fmt}', got '{converted_format}'"
+        )
+        formatted_output = formatter.c_format(c_fmt, [arg])
+        assert formatted_output == output, f"Expected '{output}', got '{formatted_output}'"
