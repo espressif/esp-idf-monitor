@@ -1,3 +1,9 @@
+## v1.6.1 (2025-04-08)
+
+### Bug Fixes
+
+- **binlog**: Fix binlog precision format
+
 ## v1.6.0 (2025-03-24)
 
 ### New Features
