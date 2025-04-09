@@ -1,3 +1,9 @@
+## v1.6.2 (2025-04-09)
+
+### Bug Fixes
+
+- Install dependencies in the release workflow
+
 ## v1.6.1 (2025-04-08)
 
 ### Bug Fixes

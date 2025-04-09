@@ -19,6 +19,7 @@ jobs:
     - name: Install dependencies
       run: |
         python -m pip install --upgrade pip build setuptools twine
+        pip install .
 
     - name: Build and upload esp-idf-monitor ${{ github.event.release.tag_name }}
       env:
