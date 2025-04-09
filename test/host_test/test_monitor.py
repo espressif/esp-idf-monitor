@@ -606,7 +606,7 @@ class TestCStyleConversion(TestBaseClass):
     )
     def test_c_format(self, c_fmt, arg, pythonic_fmt, output):
         """Test ArgFormatter.c_format with various format strings and arguments"""
-        from esp_idf_monitor.base import ArgFormatter
+        from esp_idf_monitor.base.binlog import ArgFormatter
         formatter = ArgFormatter()
         converted_format = formatter.convert_to_pythonic_format(formatter.c_format_regex.search(c_fmt))
         assert converted_format == pythonic_fmt, (
