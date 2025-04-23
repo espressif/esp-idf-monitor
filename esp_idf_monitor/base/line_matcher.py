@@ -23,7 +23,12 @@ class LineMatcher(object):
     def __init__(self, print_filter):
         # type: (str) -> None
         self._dict = dict()
-        self._re = re.compile(r'^(?:\033\[[01];?[0-9]+m?)?([EWIDV]) \([0-9]+\) ([^:]+): ')
+        self._re = re.compile(
+            r'^(?:\033\[[01];?\d+m?)?'  # ANSI color
+            r'([EWIDV]) '  # log level
+            r'(?:\([^)]+\) )?'  # optional timestamp
+            r'([^:]+): '  # tag
+        )
         items = print_filter.split()
         if len(items) == 0:
             self._dict['*'] = self.LEVEL_V  # default is to print everything

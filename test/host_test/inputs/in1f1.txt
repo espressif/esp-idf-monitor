@@ -83,4 +83,8 @@ V (371) hello_world: verbose2[0m
 [0;32mI (381) hello_world: info2[0m
 noeol 0x40080000[0;33m0x40080000: _iram_start at /home/dragon/esp/esp-idf/components/freertos/xtensa_vectors.S:1685
 [0m
+[0;32mI (1718795571035) hello_world: info3 with unix epoch timestamp[0m
+[0;32mI (10:12:51.035) hello_world: info4 with HH:MM:SS.MS[0m
+[0;32mI (24-06-19 10:12:51.035) hello_world: info5 with YY-MM-DD HH:MM:SS.MS[0m
+[0;32mI hello_world: info6 without timestamp[0m
 [0m
