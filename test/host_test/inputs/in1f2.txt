@@ -8,3 +8,7 @@ D (361) hello_world: debug2[0m
 V (371) hello_world: verbose2[0m
 [0;31mE (371) hello_world: error2[0m
 [0;32mI (381) hello_world: info2[0m
+[0;32mI (1718795571035) hello_world: info3 with unix epoch timestamp[0m
+[0;32mI (10:12:51.035) hello_world: info4 with HH:MM:SS.MS[0m
+[0;32mI (24-06-19 10:12:51.035) hello_world: info5 with YY-MM-DD HH:MM:SS.MS[0m
+[0;32mI hello_world: info6 without timestamp[0m
