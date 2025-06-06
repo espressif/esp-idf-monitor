@@ -10,7 +10,7 @@ from serial.tools import miniterm
 
 from esp_idf_monitor.base.key_config import MENU_KEY, TOGGLE_OUTPUT_KEY
 
-from .output_helpers import error_print, note_print
+from .output_helpers import error_print, note_print, yellow_print, green_print, red_print, normal_print
 
 key_description = miniterm.key_description
 
@@ -141,9 +141,18 @@ class Logger:
     def handle_possible_pc_address_in_line(self, line: bytes, insert_new_line: bool = False) -> None:
         if not self.pc_address_decoder:
             return
-        translation = self.pc_address_decoder.decode_address(line)
-        if translation:
+        decoded = self.pc_address_decoder.decode_addresses(line)
+        if decoded:
             if insert_new_line:
                 # insert a new line in case address translation is printed in the middle of a line
                 self.print(b'\n')
-            self.print(translation, console_printer=note_print)
+            for address, entries in decoded:
+                self.print(f"{address}: ", console_printer=normal_print)
+                for idx, entry in enumerate(entries):
+                    if idx > 0:
+                        self.print(' (inlined by) ', console_printer=normal_print)
+                    self.print(entry['fn'], console_printer=lambda msg: yellow_print(msg, newline=''))
+                    self.print(' in ', console_printer=normal_print)
+                    self.print(entry['path'], console_printer=lambda msg: green_print(msg, newline=''))
+                    self.print(':', console_printer=normal_print)
+                    self.print(str(entry['line']), console_printer=red_print)
