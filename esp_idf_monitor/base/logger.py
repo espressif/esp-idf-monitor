@@ -10,7 +10,8 @@ from serial.tools import miniterm
 
 from esp_idf_monitor.base.key_config import MENU_KEY, TOGGLE_OUTPUT_KEY
 
-from .output_helpers import error_print, note_print
+from .output_helpers import (COMMON_PREFIX, error_print, green_print,
+                             normal_print, note_print, red_print, yellow_print)
 
 key_description = miniterm.key_description
 
@@ -141,9 +142,40 @@ class Logger:
     def handle_possible_pc_address_in_line(self, line: bytes, insert_new_line: bool = False) -> None:
         if not self.pc_address_decoder:
             return
-        translation = self.pc_address_decoder.decode_address(line)
-        if translation:
-            if insert_new_line:
-                # insert a new line in case address translation is printed in the middle of a line
-                self.print(b'\n')
-            self.print(translation, console_printer=note_print)
+
+        # Find any executable addresses in the line and translate them to source locations.
+        translated = self.pc_address_decoder.translate_addresses(line.decode(errors='ignore'))
+        if not translated:
+            return
+
+        if insert_new_line:
+            # insert a new line in case address translation is printed in the middle of a line
+            self.print(b'\n')
+
+        # For each address and its corresponding trace
+        for address, trace in translated:
+            # Print the address (start of line, white)
+            self.print(f'{COMMON_PREFIX} {address}: ', console_printer=normal_print)
+            if not trace:
+                # No trace entries (this should not happen, but just in case, red)
+                self.print('(unknown)', console_printer=red_print)
+                continue
+
+            # For each source location in the trace
+            for idx, entry in enumerate(trace):
+                if idx > 0:
+                    # More than 1 entry indicates inlined functions (white).
+                    self.print(f'{COMMON_PREFIX} (inlined by) ', console_printer=normal_print)
+
+                # Print the function name (yellow)
+                self.print(entry.func, console_printer=lambda msg: yellow_print(msg, newline=''))
+                if entry.path == 'ROM':
+                    # Special case for ROM paths (green)
+                    self.print(' in ', console_printer=normal_print)
+                    self.print('ROM', console_printer=green_print)
+                else:
+                    # Print the file path and line number (green:red)
+                    self.print(' at ', console_printer=normal_print)
+                    self.print(entry.path, console_printer=lambda msg: green_print(msg, newline=''))
+                    self.print(':', console_printer=normal_print)
+                    self.print(entry.line, console_printer=red_print)
