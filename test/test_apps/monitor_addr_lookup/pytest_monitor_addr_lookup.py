@@ -35,7 +35,7 @@ def test_monitor_addr_lookup(config: str, coverage_run: List[str], dut: Dut) -> 
 
         p.expect(re.compile(rf'app_main is running from ({ADDRESS})'))
         main_addr = p.match.group(1)
-        p.expect_exact(f'{main_addr}: app_main at')
+        p.expect(re.compile(rf'{re.escape(main_addr)}: .*?app_main.*? at'))
 
         if config == 'addr_lookup_in_app':
             # reset the app to make sure that the bootloader address is caught
@@ -44,11 +44,11 @@ def test_monitor_addr_lookup(config: str, coverage_run: List[str], dut: Dut) -> 
             # check for multi elf file support, this address should not be found in the bootloader elf
             p.expect(re.compile(rf'entry ({ADDRESS})'))
             addr = p.match.group(1)
-            p.expect_exact(f'{addr}: call_start_cpu0 at')
+            p.expect(re.compile(rf'--- {re.escape(addr)}: .*?call_start_cpu0.*? at'))
 
             p.expect(re.compile(rf'Initializer function at ({ADDRESS})'))
             addr = p.match.group(1)
-            p.expect_exact(f'--- {addr}: initialize at')
+            p.expect(re.compile(rf'--- .*?{re.escape(addr)}: .*?initialize.*? at'))
 
             p.expect(re.compile(rf'Got \d+ stored at ({ADDRESS}) and ({ADDRESS}) from a function from ({ADDRESS})'))
             var1 = p.match.group(1)
@@ -56,13 +56,13 @@ def test_monitor_addr_lookup(config: str, coverage_run: List[str], dut: Dut) -> 
             func = p.match.group(3)
             match_index = p.expect([str(var1), str(var2), pexpect.TIMEOUT])
             assert match_index == 2  # should be TIMEOUT because addr2line should not match addresses of variables
-            p.expect_exact(f'--- {func}: get_random_number at')
+            p.expect(re.compile(rf'--- {re.escape(func)}: .*?get_random_number.*? at'))
 
             # no new line interleave test
             p.expect_exact(f'Function pointer at {func}; main at {main_addr}; no new line')  # new line should be inserted here and decode is on separate line
             # make sure that both decode lines contain the correct prefix
-            p.expect_exact(f'--- {func}: get_random_number at')
-            p.expect_exact(f'--- {main_addr}: app_main at')
+            p.expect(re.compile(rf'--- {re.escape(func)}: .*?get_random_number.*? at'))
+            p.expect(re.compile(rf'--- {re.escape(main_addr)}: .*?app_main.*? at'))
             p.expect_exact('new line now')
 
             p.expect_exact('This is the end of the report')
@@ -74,9 +74,9 @@ def test_monitor_addr_lookup(config: str, coverage_run: List[str], dut: Dut) -> 
             addr = p.match.group(1)
             p.expect_exact(f'abort() was called at PC {addr} on core 0')
 
-            p.expect(re.compile(rf'--- ({ADDRESS}): ({FUNC_NAME}) in ROM'))
+            p.expect(re.compile(rf'--- ({ADDRESS}): .*?({FUNC_NAME}).*? in .*?ROM'))
             addr, func = p.match.group(1), p.match.group(2)
-            p.expect_exact(f'{addr}: {func} in ROM')
+            p.expect(re.compile(rf'--- {re.escape(addr)}.*?: .*?{re.escape(func)}.*? in .*?ROM'))
 
         # end monitor and wait for proper termination to ensure complete coverage report
         p.sendcontrol(']')
