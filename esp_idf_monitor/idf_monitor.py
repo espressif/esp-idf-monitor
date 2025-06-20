@@ -59,8 +59,8 @@ from esp_idf_monitor.base.gdbhelper import GDBHelper
 from esp_idf_monitor.base.key_config import EXIT_KEY, EXIT_MENU_KEY, MENU_KEY
 from esp_idf_monitor.base.line_matcher import LineMatcher
 from esp_idf_monitor.base.logger import Logger
-from esp_idf_monitor.base.output_helpers import (normal_print, note_print,
-                                                 warning_print)
+from esp_idf_monitor.base.output_helpers import (error_print, normal_print,
+                                                 note_print, warning_print)
 from esp_idf_monitor.base.rom_elf_getter import get_rom_elf_path
 from esp_idf_monitor.base.serial_handler import (SerialHandler,
                                                  SerialHandlerNoElf, run_make)
@@ -138,7 +138,15 @@ class Monitor:
 
         else:
             socket_test_mode = False
-            self.serial = subprocess.Popen(self.elf_files, stdin=subprocess.PIPE, stdout=subprocess.PIPE,
+
+            if len(self.elf_files) > 1:
+                warning_print(f'Found {len(self.elf_files)} ELF files, but Linux target only supports one. Using: {self.elf_files[0]}')
+
+            if not os.path.exists(self.elf_files[0]):
+                error_print(f'ELF file {self.elf_files[0]} does not exist, cannot run monitor on Linux target. Please build the project first.')
+                sys.exit(1)
+
+            self.serial = subprocess.Popen(self.elf_files[0], stdin=subprocess.PIPE, stdout=subprocess.PIPE,
                                            stderr=subprocess.STDOUT, bufsize=0)
             self.serial_reader = LinuxReader(self.serial, self.event_queue)
 
