@@ -29,7 +29,7 @@ dynamic = ['version']
 dependencies = [
     "pyserial>=3.3",
     "esp-coredump~=1.2",
-    "esp-idf-panic-decoder~=1.2",
+    "esp-idf-panic-decoder~=1.4",
     "pyelftools",
 ]
 
