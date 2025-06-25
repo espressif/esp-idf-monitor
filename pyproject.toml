@@ -20,6 +20,7 @@ classifiers = [
     "Programming Language :: Python :: 3.10",
     "Programming Language :: Python :: 3.11",
     "Programming Language :: Python :: 3.12",
+    "Programming Language :: Python :: 3.13",
     "Operating System :: POSIX",
     "Operating System :: Microsoft :: Windows",
     "Operating System :: MacOS :: MacOS X",
@@ -43,7 +44,7 @@ Homepage = "https://github.com/espressif/esp-idf-monitor"
 [project.optional-dependencies]
 dev = [
     "pre-commit",
-    "commitizen",
+    "czespressif; python_version >= '3.9'",
     "coverage[toml]",
 ]
 ide = ["websocket-client"]
@@ -72,6 +73,7 @@ find = {namespaces = false}
 version = {attr = "esp_idf_monitor.__version__"}
 
 [tool.commitizen]
+name = "czespressif"
 version = "1.6.2"
 update_changelog_on_bump = true
 tag_format = "v$version"
@@ -82,19 +84,6 @@ bump_message = "change: Update version to $new_version"
 version_files = [
     "esp_idf_monitor/__init__.py:__version__"
 ]
-change_type_order = [
-    "BREAKING CHANGE",
-    "New Features",
-    "Bug Fixes",
-    "Code Refactoring",
-    "Performance Improvements"
-]
-
-[tool.commitizen.change_type_map]
-feat = "New Features"
-fix = "Bug Fixes"
-refactor = "Code Refactoring"
-perf = "Performance Improvements"
 
 [tool.mypy]
     disallow_incomplete_defs = false # Disallows defining functions with incomplete type annotations
