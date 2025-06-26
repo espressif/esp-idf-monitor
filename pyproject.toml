@@ -96,6 +96,11 @@ version_files = [
 [tool.coverage.run]
 parallel = true
 source = ["../esp_idf_monitor/", "../../esp_idf_monitor/", "esp_idf_monitor/"]
+
+[tool.coverage.report]
+# Ignore missing source files to handle cross-platform path issues
+skip_empty = true
+
 [tool.coverage.paths]
 # following paths will be considered as equivalent to maintain multiplatform compatibility
 source = ["./esp_idf_monitor/", "*/esp_idf_monitor/"]
