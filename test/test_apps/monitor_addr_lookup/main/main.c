@@ -28,7 +28,7 @@ static int get_random_number(void)
 
 void app_main(void)
 {
-    printf("app_main is running from 0x%x\n", (int) app_main);
+    printf("app_main is running from 0x%X\n", (int) app_main);
 
 #if CONFIG_TEST_ADDR_LOOKUP_IN_APP
     volatile int number = get_random_number();
