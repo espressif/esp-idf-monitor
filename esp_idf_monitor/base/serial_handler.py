@@ -167,6 +167,7 @@ class SerialHandler:
             text_lines, self._last_line_part = self.binlog.convert_to_text(sp[0])
             for line in text_lines:
                 self.print_colored(line)
+                self.logger.handle_possible_pc_address_in_line(line)
             return
 
         for line in sp:
