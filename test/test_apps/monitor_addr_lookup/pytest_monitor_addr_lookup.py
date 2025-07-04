@@ -33,8 +33,9 @@ def test_monitor_addr_lookup(config: str, coverage_run: List[str], dut: Dut) -> 
         ADDRESS = r'0x[a-f0-9]{8}'
         FUNC_NAME = r'[a-zA-Z_][\w]*'
 
-        p.expect(re.compile(rf'app_main is running from ({ADDRESS})'))
-        main_addr = p.match.group(1)
+        # Address should be printed in uppercase, but the decoder should be case-insensitive
+        p.expect(re.compile(rf'app_main is running from ({ADDRESS})', re.IGNORECASE))
+        main_addr = p.match.group(1).lower()
         p.expect(re.compile(rf'{re.escape(main_addr)}: .*?app_main.*? at'))
 
         if config == 'addr_lookup_in_app':
