@@ -21,6 +21,19 @@
 <hr>
 
 
+## v1.7.0 (2025-07-10)
+
+### ✨ New Features
+
+- **binlog**: Handle PC address in line for binlog *(Konstantin Kondrashov - 11ab615)*
+- Improved addr2line output formatting *(Nebojsa Cvetkovic - d8932f3)*
+
+### 🐛 Bug Fixes
+
+- Add error message for Linux monitor when no ELF files are found *(Peter Dragun - c2bc767)*
+- Update line matcher regex to handle all timestamp formats *(Peter Dragun - 74e6fb3)*
+
+
 ## v1.6.2 (2025-04-09)
 
 ### 🐛 Bug Fixes
