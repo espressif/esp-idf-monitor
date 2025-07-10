@@ -346,7 +346,7 @@ class TestHost(TestBaseClass):
         assert "--- Warning: ELF file 'non_existing.elf' does not exist" in stderr
 
     def test_binary_logging(self):
-        args = [IN_DIR + '/log.elf', IN_DIR + '/bootloader.elf']
+        args = [os.path.join(IN_DIR, 'log.elf'), os.path.join(IN_DIR, 'bootloader.elf')]
         out, err = self.run_monitor(args, 'binlog', timeout=10)
         with open(err, 'r') as f_err:
             stderr = f_err.read()
@@ -361,6 +361,19 @@ class TestHost(TestBaseClass):
                 line_out = line_out.strip()
                 line_expected = line_expected.strip()
                 assert line_out == line_expected, f'Mismatch: {line_out} != {line_expected}'
+
+        if os.name == 'nt':
+            # Windows test environment does not have toolchain installed
+            return
+        # Function addresses in the binary log output are decoded as for text logs
+        with open(os.path.join(out_dir, 'test_binary_logging.err'), 'r') as f_expected:
+            log_clean = ansi_regex.sub('', f_expected.read())
+            print(log_clean)
+            # Check for the full line with address, app_main, and main.c with line number
+            assert re.search(
+                r'0x[0-9a-f]+: app_main.* at .*main\.c.*:\d+',
+                log_clean
+            ), "Expected address, 'app_main', and 'main.c:<line>' in the output"
 
 
 @pytest.mark.skipif(os.name == 'nt', reason='Linux/MacOS only')
