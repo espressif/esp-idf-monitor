@@ -34,6 +34,7 @@ from typing import Any, List, NoReturn, Optional, Type, Union  # noqa: F401
 import serial
 from serial.tools import list_ports, miniterm
 
+from esp_idf_monitor import __version__
 # Windows console stuff
 from esp_idf_monitor.base.ansi_color_converter import get_ansi_converter
 from esp_idf_monitor.base.argument_parser import get_parser
@@ -68,8 +69,6 @@ from esp_idf_monitor.base.serial_reader import (LinuxReader, Reader,
                                                 SerialReader)
 from esp_idf_monitor.base.web_socket_client import WebSocketClient
 from esp_idf_monitor.config import Config
-
-from . import __version__
 
 key_description = miniterm.key_description
 
@@ -356,10 +355,11 @@ def detect_port() -> Union[str, NoReturn]:
 
 
 def main() -> None:
-    if not sys.stdin.isatty() and not os.environ.get('ESP_IDF_MONITOR_TEST'):
-        sys.exit('Error: Monitor requires standard input to be attached to TTY. Try using a different terminal.')
     parser = get_parser()
     args = parser.parse_args()
+
+    if not sys.stdin.isatty() and not os.environ.get('ESP_IDF_MONITOR_TEST'):
+        sys.exit('Error: Monitor requires standard input to be attached to TTY. Try using a different terminal.')
 
     # use EOL from argument; defaults to LF for Linux targets and CR otherwise
     args.eol = args.eol or ('LF' if args.target == 'linux' else 'CR')
