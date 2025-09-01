@@ -6,6 +6,7 @@ import datetime
 import errno
 import filecmp
 import os
+import random
 import re
 import socket
 import subprocess
@@ -267,7 +268,7 @@ class TestHost(TestBaseClass):
     @pytest.mark.skipif(os.name == 'nt', reason='Linux/MacOS only')
     def test_rfc2217(self, rfc2217: str):
         """Run monitor with RFC2217 port"""
-        # run with no reset because it is not supported for socker ports
+        # run with no reset because it is not supported for socket ports
         input_file = 'in1.txt'
         out, err = self.run_monitor(['--no-reset'], input_file, custom_port=rfc2217)
         with open(err, 'r') as f:
@@ -374,6 +375,42 @@ class TestHost(TestBaseClass):
                 r'0x[0-9a-f]+: app_main.* at .*main\.c.*:\d+',
                 log_clean
             ), "Expected address, 'app_main', and 'main.c:<line>' in the output"
+
+    @pytest.fixture
+    def invalid_binary_log(self):
+        with NamedTemporaryFile(delete=False) as f:
+            f.write(b'I (1) main: Starting\r\n')
+            # Binary log detection trigger
+            f.write(b'\x01')
+            # Corrupted/invalid binary log data that would cause stuck behavior
+            # The max length of the binary log frame is 1023 bytes so just to be sure we write more
+            f.write(b'\x01' + random.randbytes(1024))
+            # Text after binary log (should be processed normally)
+            f.write(b'I (1000) main: Application started\r\n')
+            # Add some valid binary log data frame from inputs/binlog
+            # Should be decoded as "I (259) example: >>> String Formatting Tests <<<"
+            f.write(b'\x02\x0c\x10\x00\x00\x85\x9c\x3f\x40\x09\x9c\x00\x00\x01\x03\xd6')
+
+        yield f.name
+        os.unlink(f.name)
+
+    def test_binary_log_invalid_data(self, invalid_binary_log: str):
+        """Test the binary log with invalid data to make sure it is processed normally and not stuck"""
+        args = [os.path.join(IN_DIR, 'log.elf')]
+        out, err = self.run_monitor(args, invalid_binary_log, timeout=15)
+        print('Using binary log file: ', invalid_binary_log)
+        with open(err, 'r') as f_err:
+            stderr = f_err.read()
+            assert 'Stopping condition has been received' in stderr
+
+        # Verify that monitor didn't get stuck and processed all data; ignore errors because we are using random data
+        with open(out, 'r', errors='ignore') as f_out:
+            output = f_out.read()
+            # Should contain messages from both before and after invalid binary log processing
+            assert 'I (1) main: Starting' in output
+            assert 'I (1000) main: Application started' in output
+            # Valid binary log data frame should be decoded
+            assert 'I (259) example: >>> String Formatting Tests <<<' in output
 
 
 @pytest.mark.skipif(os.name == 'nt', reason='Linux/MacOS only')
