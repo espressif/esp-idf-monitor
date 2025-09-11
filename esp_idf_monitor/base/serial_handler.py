@@ -164,11 +164,21 @@ class SerialHandler:
 
         sp = self.splitdata(data)
         if self.binary_log_detected:
-            text_lines, self._last_line_part = self.binlog.convert_to_text(sp[0])
-            for line in text_lines:
-                self.print_colored(line)
-                self.logger.handle_possible_pc_address_in_line(line)
-            return
+            try:
+                text_lines, self._last_line_part = self.binlog.convert_to_text(sp[0])
+                for line in text_lines:
+                    self.print_colored(line)
+                    self.logger.handle_possible_pc_address_in_line(line)
+                return
+            except ValueError:
+                # If no valid binary log frames were found, or if we have too much accumulated data
+                # without valid frames, exit binary log mode
+                self.binary_log_detected = False
+                # Process the accumulated data as regular text instead
+                accumulated_data = sp[0] if sp else b''
+                if accumulated_data:
+                    self._last_line_part = accumulated_data
+                    sp = self.splitdata(b'')  # Re-split the data normally
 
         for line in sp:
             line_strip = line.strip()

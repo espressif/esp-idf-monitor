@@ -222,25 +222,35 @@ class BinaryLog:
         frames: List[bytes] = []
         i = 0
         idx_of_last_found_pkg = 0
+
         while i < len(data):
             if len(data[i:]) < 15:  # Minimal frame len
                 break
             if self.detected(int(data[i])):
                 start_idx = i
-                control = Control(data[start_idx + 1:])
-                if control.pkg_len > len(data[i:]):
-                    break
-                frame = data[start_idx:start_idx + control.pkg_len]
-                if control.pkg_len != 0 and self.crc8(frame) == 0:
-                    frames.append(frame)
-                    idx_of_last_found_pkg = start_idx + control.pkg_len
-                    i += control.pkg_len - 1
+                try:
+                    control = Control(data[start_idx + 1:])
+                    if control.pkg_len > len(data[i:]):
+                        break
+                    frame = data[start_idx:start_idx + control.pkg_len]
+                    if control.pkg_len != 0 and self.crc8(frame) == 0:
+                        frames.append(frame)
+                        idx_of_last_found_pkg = start_idx + control.pkg_len
+                        i += control.pkg_len - 1
+                    else:
+                        raise ValueError('Invalid binary log; invalid CRC')
+                except (struct.error, IndexError):
+                    # Invalid control structure
+                    raise ValueError('Invalid binary log; invalid control structure')
+            else:
+                raise ValueError('Invalid binary log; invalid start of frame')
+
             i += 1
         # Return recognized frames and any remaining unprocessed data
         return frames, data[idx_of_last_found_pkg:]
 
     def convert_to_text(self, data: bytes) -> Tuple[List[bytes], bytes]:
-        messages: List[bytes] = [b'']
+        messages: List[bytes] = []
         frames, incomplete_fragment = self.find_frames(data)
         for pkg_msg in frames:
             elf_path = self.source_of_message(pkg_msg[0])
@@ -257,7 +267,7 @@ class BinaryLog:
         return f'{level_name} ({message.timestamp}) {message.tag}: {text_msg}\n'.encode('ascii')
 
     def format_buffer_message(self, message) -> List[bytes]:
-        text_msg: List[bytes] = [b'']
+        text_msg: List[bytes] = []
         BYTES_PER_LINE = 16
         buff_len = message.args[0]
         buffer = message.args[1]
