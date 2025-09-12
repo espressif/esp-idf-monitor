@@ -21,6 +21,17 @@
 <hr>
 
 
+## v1.8.0 (2025-09-12)
+
+### ✨ New Features
+
+- Build executables and attach to GitHub release *(Peter Dragun - fb2676e)*
+
+### 🐛 Bug Fixes
+
+- **binary_log**: Fix monitor being stuck on decoding invalid binary log data *(Peter Dragun - 3b0e86c)*
+
+
 ## v1.7.0 (2025-07-10)
 
 ### ✨ New Features
