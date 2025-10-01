@@ -1,6 +1,6 @@
 # Espressif IDF Monitor
 
-The ```esp-idf-monitor``` is a Python-based, open-source package that is part of the [ESP-IDF](https://github.com/espressif/esp-idf) SDK for Espressif products.
+The `esp-idf-monitor` is a Python-based, open-source package that is part of the [ESP-IDF](https://github.com/espressif/esp-idf) SDK or can be used as a standalond tool for monitoring of Espressif microcontrollers.
 
 The main responsibility of the IDF Monitor is serial communication input and output in ESP-IDF projects.
 
@@ -11,12 +11,46 @@ Other advanced topics like configuration file will be described in the following
 
 ### Table of Contents
 
+- [Installation](#installation)
+- [Usage](#usage)
 - [Configuration File](#configuration-file)
   - [File Location](#file-location)
   - [Configuration Options](#configuration-options)
     - [Custom Reset Sequence](#custom-reset-sequence)
       - [Share Configuration Across Tools](#share-configuration-across-tools)
   - [Syntax](#syntax)
+
+## Installation
+
+You can install the project with your favorite package manager, but for standalone installations it is recommended to use [uv](https://docs.astral.sh/uv/) or [pipx](https://pipx.pypa.io/stable/). Using one of the following commands:
+
+```sh
+uv install esp-idf-monitor
+```
+
+or
+
+```sh
+pipx install esp-idf-monitor
+```
+
+These will install an `idf-monitor` executable for the current user without requiring administrator privileges.
+
+## Usage
+
+Usually IDF Monitor is run within ESP-IDF environment, which prefills a lot of arguments for features such as address decoding. However, IDF Monitor can work as standalone tool as well. For the standalone mode run:
+
+```sh
+idf-monitor
+```
+
+or
+
+```sh
+python -m esp_idf_monitor
+```
+
+For all parameters and their function please see `idf-monitor --help`.
 
 ## Configuration File
 
@@ -27,7 +61,7 @@ Other advanced topics like configuration file will be described in the following
 
 ### File Location
 
-The default name for a configuration file is `esp-idf-monitor.cfg`. First, the same directory `esp-idf-monitor` is being run if is inspected.
+The default name for a configuration file is `esp-idf-monitor.cfg`. First, the same directory where `esp-idf-monitor` is being run is inspected.
 
 If a configuration file is not found here, the current user's OS configuration directory is inspected next:
 
@@ -90,7 +124,7 @@ Example:
 custom_reset_sequence = U0,1|W0.1|D1|R0|W0.5|D0
 ```
 
-Refer to [custom reset sequence](https://docs.espressif.com/projects/esptool/en/latest/esptool/configuration-file.html#custom-reset-sequence) from Esptool documentation for further details. Please note that ``custom_reset_sequence`` is the only used value from the Esptool configuration, and others will be ignored in IDF Monitor.
+Refer to [custom reset sequence](https://docs.espressif.com/projects/esptool/en/latest/esptool/configuration-file.html#custom-reset-sequence) from Esptool documentation for further details. Please note that `custom_reset_sequence` is the only used value from the Esptool configuration, and others will be ignored in IDF Monitor.
 
 ##### Share Configuration Across Tools
 
@@ -136,20 +170,20 @@ skip_menu_key = False
 
 ### Code Style & Static Analysis
 
-Please follow these coding standards when writing code for ``esp-idf-monitor``:
+Please follow these coding standards when writing code for `esp-idf-monitor`:
 
 #### Pre-commit Checks
 
 [pre-commit](https://pre-commit.com/) is a framework for managing pre-commit hooks. These hooks help to identify simple issues before committing code for review.
 
-To use the tool, first install ``pre-commit``. Then enable the ``pre-commit`` and ``commit-msg`` git hooks:
+To use the tool, first install `pre-commit`. Then enable the `pre-commit` and `commit-msg` git hooks:
 
 ```sh
 python -m pip install pre-commit
 pre-commit install -t pre-commit -t commit-msg
 ```
 
-On the first commit ``pre-commit`` will install the hooks, subsequent checks will be significantly faster. If an error is found an appropriate error message will be displayed.
+On the first commit `pre-commit` will install the hooks, subsequent checks will be significantly faster. If an error is found an appropriate error message will be displayed.
 
 ##### Codespell Check
 
@@ -157,7 +191,7 @@ This repository utilizes an automatic [spell checker](https://github.com/codespe
 
 #### Conventional Commits
 
-``esp-idf-monitor`` complies with the [Conventional Commits standard](https://www.conventionalcommits.org/en/v1.0.0/#specification). Every commit message is checked with [Conventional Precommit Linter](https://github.com/espressif/conventional-precommit-linter), ensuring it adheres to the standard.
+`esp-idf-monitor` complies with the [Conventional Commits standard](https://www.conventionalcommits.org/en/v1.0.0/#specification). Every commit message is checked with [Conventional Precommit Linter](https://github.com/espressif/conventional-precommit-linter), ensuring it adheres to the standard.
 
 ## License
 
