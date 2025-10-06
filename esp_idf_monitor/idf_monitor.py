@@ -342,7 +342,8 @@ def detect_port() -> Union[str, NoReturn]:
             ]
         port: str = port_list[-1].device
         # keep the `/dev/ttyUSB0` default port on linux if connected
-        # TODO: This can be removed in next major release
+        # TODO: This can be removed in next major release and some
+        # ports can be prioritized like in esptool and ESP-IDF
         if sys.platform == 'linux':
             for p in port_list:
                 if p.device == '/dev/ttyUSB0':
