@@ -73,4 +73,4 @@ LOW = True
 HIGH = False
 
 # Port names to filter out
-FILTERED_PORTS = ('Bluetooth-Incoming-Port', 'wlan-debug')
+FILTERED_PORTS = ('Bluetooth-Incoming-Port', 'wlan-debug', 'cu.debug-console')
