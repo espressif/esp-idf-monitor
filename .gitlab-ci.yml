@@ -75,6 +75,11 @@ workflow:
   variables:
     IDF_BRANCH: "latest"
 
+.idf_template_v6:
+  image: espressif/idf:release-v6.0
+  variables:
+    IDF_BRANCH: "v6_0"
+
 .idf_template_oldest:
   image: espressif/idf:release-v5.1
   variables:
@@ -244,6 +249,11 @@ build_idf_latest:
     - .idf_template_latest
     - .build_pytest_template
 
+build_idf_v6.0:
+  extends:
+    - .idf_template_v6
+    - .build_pytest_template
+
 build_idf_v5.1:
   extends:
     - .idf_template_oldest
@@ -254,6 +264,11 @@ build_idf_v5.1:
 test_target_apps_latest:
   extends:
     - .idf_template_latest
+    - .target_test_template
+
+test_target_apps_v6.0:
+  extends:
+    - .idf_template_v6
     - .target_test_template
 
 test_target_apps_v5.1:
