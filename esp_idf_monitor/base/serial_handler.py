@@ -44,6 +44,7 @@ from .key_config import EXIT_KEY
 from .key_config import MENU_KEY
 from .line_matcher import LineMatcher  # noqa: F401
 from .logger import Logger  # noqa: F401
+from .monitor_secure_exec import SecureMonitorCommandExecutor
 from .output_helpers import ANSI_GREEN_B
 from .output_helpers import ANSI_NORMAL_B
 from .output_helpers import ANSI_RED_B
@@ -123,6 +124,7 @@ class SerialHandler:
         self.disable_auto_color = disable_auto_color
         self.binlog = BinaryLog(elf_files)
         self.binary_log_detected = False
+        self.monitor_cmd_executor = SecureMonitorCommandExecutor(self.logger)
 
     def splitdata(self, data):  # type: (bytes) -> List[bytes]
         """
@@ -207,6 +209,7 @@ class SerialHandler:
                 for line in text_lines:
                     self.print_colored(line)
                     self.logger.handle_possible_pc_address_in_line(line)
+                    self.monitor_cmd_executor.execute_from_log_line(line)
                 return
             except ValueError:
                 # If no valid binary log frames were found, or if we have too much accumulated data
@@ -241,6 +244,7 @@ class SerialHandler:
                     self.print_colored(line)
                     self.compare_elf_sha256(decoded_line)
                     self.logger.handle_possible_pc_address_in_line(line_strip)
+                    self.monitor_cmd_executor.execute_from_log_line(line)
             check_gdb_stub_and_run(line_strip)
             self._force_line_print = False
 
@@ -262,6 +266,7 @@ class SerialHandler:
             self._force_line_print = True
             self.print_colored(self._last_line_part)
             self.logger.handle_possible_pc_address_in_line(self._last_line_part, insert_new_line=True)
+            self.monitor_cmd_executor.execute_from_log_line(self._last_line_part)
             check_gdb_stub_and_run(self._last_line_part)
             # It is possible that the incomplete line cuts in half the PC
             # address. A small buffer is kept and will be used the next time
@@ -393,6 +398,7 @@ class SerialHandlerNoElf(SerialHandler):
 
             if self._force_line_print or line_matcher.match(line.decode(errors='ignore')):
                 self.print_colored(line)
+                self.monitor_cmd_executor.execute_from_log_line(line)
                 self._force_line_print = False
 
         if self._last_line_part.startswith(CONSOLE_STATUS_QUERY):
@@ -409,4 +415,5 @@ class SerialHandlerNoElf(SerialHandler):
         if self._last_line_part != b'' and force_print_or_matched:
             self._force_line_print = True
             self.print_colored(self._last_line_part)
+            self.monitor_cmd_executor.execute_from_log_line(self._last_line_part)
             self._last_line_part = b''
