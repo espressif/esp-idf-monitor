@@ -7,6 +7,7 @@ name = "esp-idf-monitor"
 authors = [{name = "Espressif Systems"}]
 description = "Serial monitor for esp-idf"
 keywords = ["espressif", "embedded", "monitor", "serial"]
+license = {text = "Apache-2.0"}
 classifiers = [
     "Development Status :: 5 - Production/Stable",
     "Intended Audience :: Developers",
@@ -21,6 +22,7 @@ classifiers = [
     "Programming Language :: Python :: 3.11",
     "Programming Language :: Python :: 3.12",
     "Programming Language :: Python :: 3.13",
+    "Programming Language :: Python :: 3.14",
     "Operating System :: POSIX",
     "Operating System :: Microsoft :: Windows",
     "Operating System :: MacOS :: MacOS X",
