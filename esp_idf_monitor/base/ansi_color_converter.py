@@ -6,7 +6,8 @@ import os
 import re
 import sys
 from io import TextIOBase  # noqa: F401
-from typing import Any, Optional, TextIO, Union  # noqa: F401
+from typing import TextIO  # noqa: F401
+from typing import Union  # noqa: F401
 
 from .output_helpers import ANSI_NORMAL
 
@@ -29,7 +30,7 @@ if os.name == 'nt':
 
 
 def get_ansi_converter(orig_output_method=None, force_color=False):
-    # type: (Any[TextIO, Optional[TextIOBase]], bool) -> Union[ANSIColorConverter, Optional[TextIOBase]]
+    # type: (Union[TextIO, TextIOBase, None], bool) -> Union[ANSIColorConverter, TextIOBase, TextIO, None]
     """
     Returns an ANSIColorConverter on Windows and the original output method (orig_output_method) on other platforms.
     The ANSIColorConverter with force_color=True will be forced to use ANSI color codes
@@ -39,7 +40,7 @@ def get_ansi_converter(orig_output_method=None, force_color=False):
     return orig_output_method
 
 
-class ANSIColorConverter(object):
+class ANSIColorConverter:
     """Class to wrap a file-like output stream, intercept ANSI color codes,
     and convert them into calls to Windows SetConsoleTextAttribute.
 
@@ -51,7 +52,7 @@ class ANSIColorConverter(object):
     """
 
     def __init__(self, output=None, force_color=False):
-        # type: (TextIOBase, bool) -> None
+        # type: (Union[TextIO, TextIOBase, None], bool) -> None
         self.output = output
         # check if output supports writing bytes or if decoding before writing is necessary
         try:
@@ -73,7 +74,7 @@ class ANSIColorConverter(object):
                 self.decode_buffer = b''
             else:
                 self.output.write(data)  # type: ignore
-        except (IOError, OSError):
+        except OSError:
             # Windows 10 bug since the Fall Creators Update, sometimes writing to console randomly throws
             # an exception (however, the character is still written to the screen)
             # Ref https://github.com/espressif/esp-idf/issues/1163
@@ -104,7 +105,7 @@ class ANSIColorConverter(object):
             elif (length == 1 and b == b'[') or (1 < length < 7):
                 self.matched += b
                 if self.matched == ANSI_NORMAL.encode('latin-1'):  # reset console
-                    # Flush is required only with Python3 - switching color before it is printed would mess up the console
+                    # Flush is required only with Python3 - switching color before it is printed would mess up console
                     self.flush()
                     SetConsoleTextAttribute(self.handle, FOREGROUND_GREY)
                     self.matched = b''
@@ -119,7 +120,8 @@ class ANSIColorConverter(object):
                         color = ANSI_TO_WINDOWS_COLOR[int(m.group(2))]
                         if m.group(1) == b'1':
                             color |= FOREGROUND_INTENSITY
-                        # Flush is required only with Python3 - switching color before it is printed would mess up the console
+                        # Flush is required only with Python3 - switching color before it is printed would
+                        # mess up the console
                         self.flush()
                         SetConsoleTextAttribute(self.handle, color)
                     else:

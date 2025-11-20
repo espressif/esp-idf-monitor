@@ -14,7 +14,10 @@ import sys
 import threading
 import time
 from tempfile import NamedTemporaryFile
-from typing import Dict, List, Optional, Tuple
+from typing import Dict
+from typing import List
+from typing import Optional
+from typing import Tuple
 
 import pytest
 
@@ -44,20 +47,20 @@ def on_timeout(process):
             raise
 
 
-def filename_fix(input: str) -> str:
+def filename_fix(input_filename: str) -> str:
     """Remove invalid characters from filename on Windows"""
     if os.name == 'nt':
         regex = re.compile(r'[\\/:*?\"<>|]')
-        return regex.sub('', input)
-    return input
+        return regex.sub('', input_filename)
+    return input_filename
 
 
 class TestBaseClass:
     """Base class to define shared fixtures and methods"""
 
-    master_fd : Optional[int]
-    slave_fd : Optional[int]
-    proc : subprocess.Popen
+    master_fd: Optional[int]
+    slave_fd: Optional[int]
+    proc: subprocess.Popen
 
     def send_control(self, sequence: str):
         """Send a control sequence to monitor STDIN
@@ -76,7 +79,7 @@ class TestBaseClass:
         # close monitor
         self.send_control(']')
 
-        ret : Optional[int] = None
+        ret: Optional[int] = None
         for _ in range(timeout):
             ret = self.proc.poll()
             if ret is not None:
@@ -86,14 +89,19 @@ class TestBaseClass:
             pytest.fail(f'Monitor took longer than {timeout} seconds to exit')
         return ret
 
-    def run_monitor_async(self, args: List[str] = [], custom_port: str = '', ignore_input: bool = False) -> Tuple[str, str]:
+    def run_monitor_async(
+        self, args: List[str] = [], custom_port: str = '', ignore_input: bool = False
+    ) -> Tuple[str, str]:
         """Run monitor in async mode
         ignore_input=True will disable input and enable monitor test mode
         Returns filenames for stdout and stderr
         """
         cmd = [
-            sys.executable, '-m', 'esp_idf_monitor', '--port',
-            custom_port if custom_port else f'socket://{HOST}:{self.port}?logging=debug'
+            sys.executable,
+            '-m',
+            'esp_idf_monitor',
+            '--port',
+            custom_port if custom_port else f'socket://{HOST}:{self.port}?logging=debug',
         ] + args
         env = os.environ.copy()
         if ignore_input:
@@ -111,7 +119,9 @@ class TestBaseClass:
         time.sleep(3 if os.name == 'nt' else 1)
         return f'{output_file}.out', f'{output_file}.err'
 
-    def run_monitor(self, args: List[str], input_file: str, custom_port: str = '', timeout: int = 60) -> Tuple[str, str]:
+    def run_monitor(
+        self, args: List[str], input_file: str, custom_port: str = '', timeout: int = 60
+    ) -> Tuple[str, str]:
         """Run IDF Monitor in test mode with timeout
         Returns filenames for stdout and stderr
         """
@@ -150,8 +160,10 @@ class TestBaseClass:
             if os.name == 'nt':
                 # remove escape sequences form the file and create a new temp file
                 ansi_regex = re.compile(r'\x1B\[\d+(;\d+){0,2}m')
-                with NamedTemporaryFile(dir=IN_DIR, delete=False, mode='w+') as converted, open(os.path.join(IN_DIR, expected_out), 'r') as input:
-                    converted.writelines(ansi_regex.sub('', input.read()))
+                with NamedTemporaryFile(dir=IN_DIR, delete=False, mode='w+') as converted, open(
+                    os.path.join(IN_DIR, expected_out)
+                ) as input_file:
+                    converted.writelines(ansi_regex.sub('', input_file.read()))
                     expected_out = converted.name
             return filecmp.cmp(file, os.path.join(IN_DIR, expected_out), shallow=False)
         finally:
@@ -189,12 +201,11 @@ class TestBaseClass:
         try:
             self.serversocket.shutdown(socket.SHUT_RDWR)
             self.serversocket.close()
-        except (OSError, socket.error):
+        except OSError:
             pass
 
 
 class TestHost(TestBaseClass):
-
     @pytest.fixture
     def rfc2217(self):
         """Run RFC2217 server from esptool"""
@@ -208,8 +219,9 @@ class TestHost(TestBaseClass):
         yield f'rfc2217://localhost:{rfc2217_port}?ign_set_control'
         p.terminate()
 
+    # fmt: off
     @pytest.mark.parametrize(
-        ['input_file', 'filter', 'expected_out', 'timeout'],
+        ['input_file', 'filter_pattern', 'expected_out', 'timeout'],
         [
             ('in1.txt', '',                                      'in1f1.txt',  60,),
             ('in1.txt', '*:V',                                   'in1f1.txt',  60,),
@@ -219,12 +231,13 @@ class TestHost(TestBaseClass):
             ('in2.txt', 'vfs',                                   'in2f2.txt', 420,),
         ]
     )
+    # fmt: on
     @pytest.mark.flaky(reruns=2)
-    def test_print_filter(self, input_file: str, filter: str, expected_out: str, timeout: int):
+    def test_print_filter(self, input_file: str, filter_pattern: str, expected_out: str, timeout: int):
         """Test monitor filtering feature"""
-        args = ['--print_filter', filter]
+        args = ['--print_filter', filter_pattern]
         out, err = self.run_monitor(args, input_file, timeout=timeout)
-        with open(err, 'r') as f_err:
+        with open(err) as f_err:
             stderr = f_err.read()
             assert 'Stopping condition has been received' in stderr
         assert self.filecmp(out, expected_out)
@@ -233,7 +246,7 @@ class TestHost(TestBaseClass):
         """Test monitor auto-coloring feature"""
         # run monitor on empty input
         out, err = self.run_monitor([], 'color.txt')
-        with open(err, 'r') as f_err:
+        with open(err) as f_err:
             stderr = f_err.read()
             assert 'Stopping condition has been received' in stderr
         assert self.filecmp(out, 'color_out.txt')
@@ -258,11 +271,13 @@ class TestHost(TestBaseClass):
             assert self.close_monitor_async() == 0
         finally:
             clientsocket.close()
-        with open(out, 'r') as f_out:
+        with open(out) as f_out:
             output = f_out.read()
         assert '\033[0;32mI (1234) start of the line, continue on the next line\033[0m\n' in output
         assert '\033[0;33mW (1234) mixed line endings\033[0m\n' in output
-        regex = re.compile(r'\d{4}-\d{2}-\d{2} \d{2}:\d{2}:\d{2} \033\[1;31mE \(1234\) error log with a timestamp\033\[0m\n')
+        regex = re.compile(
+            r'\d{4}-\d{2}-\d{2} \d{2}:\d{2}:\d{2} \033\[1;31mE \(1234\) error log with a timestamp\033\[0m\n'
+        )
         assert regex.search(output) is not None
 
     @pytest.mark.skipif(os.name == 'nt', reason='Linux/MacOS only')
@@ -271,10 +286,10 @@ class TestHost(TestBaseClass):
         # run with no reset because it is not supported for socket ports
         input_file = 'in1.txt'
         out, err = self.run_monitor(['--no-reset'], input_file, custom_port=rfc2217)
-        with open(err, 'r') as f:
+        with open(err) as f:
             stderr = f.read()
         # check if monitor is running on RFC2217 port
-        regex = re.compile(rf'--- esp-idf-monitor \d\.\d(\.\d)? on {re.escape(rfc2217)} \d*')
+        regex = re.compile(rf"--- esp-idf-monitor \d\.\d(\.\d)? on {re.escape(rfc2217)} \d*")
         assert regex.search(stderr) is not None
         assert 'Exception' not in stderr
         assert 'Stopping condition has been received' in stderr
@@ -294,7 +309,7 @@ class TestHost(TestBaseClass):
         self.send_control('TX')
         assert self.close_monitor_async() == 0
 
-        with open(err, 'r') as f_err:
+        with open(err) as f_err:
             stderr = f_err.read()
         assert '--- Running make app-flash...' in stderr  # Triggered by TA
         assert '--- Running make flash...' in stderr  # TF
@@ -323,9 +338,9 @@ class TestHost(TestBaseClass):
             monitor_watchdog.cancel()
         finally:
             clientsocket.close()
-        with open(err, 'r') as f_err:
+        with open(err) as f_err:
             stderr = f_err.read()
-        with open(out, 'r') as f_out:
+        with open(out) as f_out:
             stdout = f_out.read()
         # check that timestamps are enabled
         date = datetime.datetime.now().strftime('%Y-%m-%d')
@@ -342,39 +357,38 @@ class TestHost(TestBaseClass):
         """Run monitor with a path to non-existing ELF file"""
         # run monitor on empty input
         out, err = self.run_monitor_async(args=['non_existing.elf'])
-        with open(err, 'r') as f_err:
+        with open(err) as f_err:
             stderr = f_err.read()
         assert "--- Warning: ELF file 'non_existing.elf' does not exist" in stderr
 
     def test_binary_logging(self):
         args = [os.path.join(IN_DIR, 'log.elf'), os.path.join(IN_DIR, 'bootloader.elf')]
         out, err = self.run_monitor(args, 'binlog', timeout=10)
-        with open(err, 'r') as f_err:
+        with open(err) as f_err:
             stderr = f_err.read()
             assert 'Stopping condition has been received' in stderr
 
         ansi_regex = re.compile(r'\x1B\[\d+(;\d+){0,2}m')
-        with open(out, 'r') as f_out, open(os.path.join(IN_DIR, 'binlog_out.txt'), 'r') as f_expected:
+        with open(out) as f_out, open(os.path.join(IN_DIR, 'binlog_out.txt')) as f_expected:
             for line_out, line_expected in zip(f_out, f_expected):
                 if os.name == 'nt':
                     line_expected = ansi_regex.sub('', line_expected)
                     line_out = ansi_regex.sub('', line_out)
                 line_out = line_out.strip()
                 line_expected = line_expected.strip()
-                assert line_out == line_expected, f'Mismatch: {line_out} != {line_expected}'
+                assert line_out == line_expected, f"Mismatch: {line_out} != {line_expected}"
 
         if os.name == 'nt':
             # Windows test environment does not have toolchain installed
             return
         # Function addresses in the binary log output are decoded as for text logs
-        with open(os.path.join(out_dir, 'test_binary_logging.err'), 'r') as f_expected:
+        with open(os.path.join(out_dir, 'test_binary_logging.err')) as f_expected:
             log_clean = ansi_regex.sub('', f_expected.read())
             print(log_clean)
             # Check for the full line with address, app_main, and main.c with line number
-            assert re.search(
-                r'0x[0-9a-f]+: app_main.* at .*main\.c.*:\d+',
-                log_clean
-            ), "Expected address, 'app_main', and 'main.c:<line>' in the output"
+            assert re.search(r'0x[0-9a-f]+: app_main.* at .*main\.c.*:\d+', log_clean), (
+                "Expected address, 'app_main', and 'main.c:<line>' in the output"
+            )
 
     @pytest.fixture
     def invalid_binary_log(self):
@@ -399,12 +413,12 @@ class TestHost(TestBaseClass):
         args = [os.path.join(IN_DIR, 'log.elf')]
         out, err = self.run_monitor(args, invalid_binary_log, timeout=15)
         print('Using binary log file: ', invalid_binary_log)
-        with open(err, 'r') as f_err:
+        with open(err) as f_err:
             stderr = f_err.read()
             assert 'Stopping condition has been received' in stderr
 
         # Verify that monitor didn't get stuck and processed all data; ignore errors because we are using random data
-        with open(out, 'r', errors='ignore') as f_out:
+        with open(out, errors='ignore') as f_out:
             output = f_out.read()
             # Should contain messages from both before and after invalid binary log processing
             assert 'I (1) main: Starting' in output
@@ -415,7 +429,6 @@ class TestHost(TestBaseClass):
 
 @pytest.mark.skipif(os.name == 'nt', reason='Linux/MacOS only')
 class TestConfig(TestBaseClass):
-
     def create_config(self, options: Dict[str, str], section='esp-idf-monitor', filename: str = 'config.cfg'):
         """Create a new config file in CWD"""
         config = [f'[{section}]\n']
@@ -425,10 +438,7 @@ class TestConfig(TestBaseClass):
             f.writelines(config)
         return filename
 
-    @pytest.mark.parametrize(
-        'filename',
-        ['esp-idf-monitor.cfg', 'config.cfg', 'tox.ini']
-    )
+    @pytest.mark.parametrize('filename', ['esp-idf-monitor.cfg', 'config.cfg', 'tox.ini'])
     def test_custom_config(self, filename: str):
         """Run monitor with custom and validate it is NOT case-sensitive"""
         # create custom config
@@ -447,7 +457,7 @@ class TestConfig(TestBaseClass):
         finally:
             os.unlink(filename)
 
-        with open(err, 'r') as f_err:
+        with open(err) as f_err:
             stderr = f_err.read()
         # make sure that custom config was applied and stderr has message about it
         assert f'--- Loaded custom configuration from {os.path.join(os.getcwd(), filename)}' in stderr
@@ -474,7 +484,7 @@ class TestConfig(TestBaseClass):
         time.sleep(1)  # wait for make to run
         assert self.close_monitor_async() == 0
 
-        with open(err, 'r') as f_err:
+        with open(err) as f_err:
             stderr = f_err.read()
         # make sure that menu was skipped
         assert '--- Using the "skip_menu_key" option from a config file.' in stderr
@@ -487,14 +497,16 @@ class TestConfig(TestBaseClass):
         _, err = self.run_monitor_async()
         assert self.close_monitor_async() == 0
 
-        with open(err, 'r') as f_err:
+        with open(err) as f_err:
             stderr = f_err.read()
         # make sure that custom config was applied and stderr has message about it
         assert f'--- Loaded custom configuration from {os.path.join(os.getcwd(), "config.cfg")}' in stderr
         # check that stderr has message that config was not correct and fallback option works
         assert '--- Ignoring unknown configuration options: foo' in stderr
-        assert "--- Error: Unsupported configuration for key: '.', please use just the English alphabet " \
+        assert (
+            "--- Error: Unsupported configuration for key: '.', please use just the English alphabet "
             "characters (A-Z) and [,],\\,^,_. Using the default option 'R'." in stderr
+        )
 
     def test_esptool_sequence(self):
         """Use custom reset sequence to reset into bootloader"""
@@ -508,7 +520,7 @@ class TestConfig(TestBaseClass):
         time.sleep(0.5)
         assert self.close_monitor_async() == 0
 
-        with open(err, 'r') as f_err:
+        with open(err) as f_err:
             stderr = f_err.read()
         msg = f'--- Using custom reset sequence from esptool config file: {os.path.join(os.getcwd(), "config.cfg")}'
         assert msg in stderr
@@ -525,7 +537,8 @@ class TestConfig(TestBaseClass):
         assert '\n'.join(my_seq) in log_seq
 
     def test_custom_sequence_precedence(self):
-        """Define custom reset sequence in esptool and esp-idf-monitor sections and make sure that the one from esp-idf-monitor is used"""
+        """Define custom reset sequence in esptool and esp-idf-monitor sections and
+        make sure that the one from esp-idf-monitor is used"""
         # create custom config with custom reset sequence
         filename = self.create_config({'custom_reset_sequence': 'R1|W0.1|R0|D1'})
         with open(filename, 'a') as f:
@@ -538,7 +551,7 @@ class TestConfig(TestBaseClass):
         time.sleep(0.5)
         assert self.close_monitor_async() == 0
 
-        with open(err, 'r') as f_err:
+        with open(err) as f_err:
             stderr = f_err.read()
         msg = f'--- Using custom reset sequence config file: {os.path.join(os.getcwd(), "config.cfg")}'
         assert msg in stderr
@@ -566,7 +579,7 @@ class TestConfig(TestBaseClass):
         time.sleep(0.5)
         assert self.close_monitor_async() == 0
 
-        with open(err, 'r') as f_err:
+        with open(err) as f_err:
             stderr = f_err.read()
         # check for error message that reset sequence was invalid
         assert f'--- Using custom reset sequence config file: {os.path.join(os.getcwd(), "config.cfg")}' in stderr
@@ -584,10 +597,8 @@ class TestCStyleConversion(TestBaseClass):
             ('|%10s|', 'ESP32', '{:>10s}', '|     ESP32|'),
             ('|%-10s|', 'ESP32', '{:<10s}', '|ESP32     |'),
             ('|%.5s|', 'Hello_world', '{:>.5s}', '|Hello|'),
-
             # Character formatting
             ('|%c|', chr(65), '{:s}', '|A|'),
-
             # Integer formatting
             ('|%d|', 123, '{:d}', '|123|'),
             ('|%5d|', 42, '{:5d}', '|   42|'),
@@ -603,10 +614,8 @@ class TestCStyleConversion(TestBaseClass):
             ('|% 10d|', 42, '{: 10d}', '|        42|'),
             ('|%-+10d|', 42, '{:<+10d}', '|+42       |'),
             ('|%- 10d|', 42, '{:< 10d}', '| 42       |'),
-
             # Pointer formatting
-            ('|%p|', 0x3ff26523, '{:#x}', '|0x3ff26523|'),
-
+            ('|%p|', 0x3FF26523, '{:#x}', '|0x3ff26523|'),
             # Hexadecimal formatting
             ('|%x|', 255, '{:x}', '|ff|'),
             ('|%X|', 255, '{:X}', '|FF|'),
@@ -621,7 +630,6 @@ class TestCStyleConversion(TestBaseClass):
             ('|%#X|', 255, '{:#X}', '|0XFF|'),
             ('|%#10x|', 42, '{:#10x}', '|      0x2a|'),
             ('|%-#10x|', 42, '{:<#10x}', '|0x2a      |'),
-
             # Octal formatting
             ('|%o|', 8, '{:o}', '|10|'),
             ('|%#o|', 8, '{:#o}', '|010|'),
@@ -629,7 +637,6 @@ class TestCStyleConversion(TestBaseClass):
             ('|%#ho|', 511, '{:#o}', '|0777|'),
             ('|%#10o|', 42, '{:#10o}', '|       052|'),
             ('|%-#10o|', 42, '{:<#10o}', '|052       |'),
-
             # Float formatting
             ('|%f|', 123.456, '{:f}', '|123.456000|'),
             ('|%.2f|', 123.456, '{:.2f}', '|123.46|'),
@@ -638,18 +645,15 @@ class TestCStyleConversion(TestBaseClass):
             ('|%-10.2f|', 3.14159, '{:<10.2f}', '|3.14      |'),
             ('|%10.6f|', -123.45678933, '{:10.6f}', '|-123.456789|'),
             ('|%-10.6f|', -123.45678933, '{:<10.6f}', '|-123.456789|'),
-
             # Scientific float formatting
             ('|%F|', 123456.789, '{:F}', '|123456.789000|'),
             ('|%e|', 123456.789, '{:e}', '|1.234568e+05|'),
             ('|%E|', 123456.789, '{:E}', '|1.234568E+05|'),
             ('|%g|', 123456.789, '{:g}', '|123457|'),
             ('|%G|', 123456.789, '{:G}', '|123457|'),
-
             # Literal percent sign
             ('|%%|', '', '%', '|%|'),
             ('|%%| |%s|', 'Hello_world', '%', '|%| |Hello_world|'),
-
             # } character in c-style format does not break pythonic format conversion
             ('} |%s|', 'Hello_world', '{:>s}', '} |Hello_world|'),
         ],
@@ -657,10 +661,9 @@ class TestCStyleConversion(TestBaseClass):
     def test_c_format(self, c_fmt, arg, pythonic_fmt, output):
         """Test ArgFormatter.c_format with various format strings and arguments"""
         from esp_idf_monitor.base.binlog import ArgFormatter
+
         formatter = ArgFormatter()
         converted_format = formatter.convert_to_pythonic_format(formatter.c_format_regex.search(c_fmt))
-        assert converted_format == pythonic_fmt, (
-            f"Expected Pythonic format '{pythonic_fmt}', got '{converted_format}'"
-        )
+        assert converted_format == pythonic_fmt, f"Expected Pythonic format '{pythonic_fmt}', got '{converted_format}'"
         formatted_output = formatter.c_format(c_fmt, [arg])
         assert formatted_output == output, f"Expected '{output}', got '{formatted_output}'"

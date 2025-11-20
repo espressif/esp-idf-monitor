@@ -3,22 +3,39 @@
 
 import queue  # noqa: F401
 import textwrap
-from typing import Any, Optional  # noqa: F401
+from typing import Any  # noqa: F401
+from typing import Optional  # noqa: F401
 
 from serial.tools import miniterm
 
 from esp_idf_monitor import __version__
 
-from .constants import (CMD_APP_FLASH, CMD_ENTER_BOOT, CMD_MAKE,
-                        CMD_OUTPUT_TOGGLE, CMD_RESET, CMD_STOP,
-                        CMD_TOGGLE_LOGGING, CMD_TOGGLE_TIMESTAMPS, CTRL_H,
-                        TAG_CMD, TAG_KEY)
-from .key_config import (CHIP_RESET_BOOTLOADER_KEY, CHIP_RESET_KEY,
-                         COMMAND_KEYS, EXIT_KEY, EXIT_MENU_KEY, MENU_KEY,
-                         RECOMPILE_UPLOAD_APP_KEY, RECOMPILE_UPLOAD_KEY,
-                         SKIP_MENU_KEY, TOGGLE_LOG_KEY, TOGGLE_OUTPUT_KEY,
-                         TOGGLE_TIMESTAMPS_KEY)
-from .output_helpers import COMMON_PREFIX, error_print, red_print
+from .constants import CMD_APP_FLASH
+from .constants import CMD_ENTER_BOOT
+from .constants import CMD_MAKE
+from .constants import CMD_OUTPUT_TOGGLE
+from .constants import CMD_RESET
+from .constants import CMD_STOP
+from .constants import CMD_TOGGLE_LOGGING
+from .constants import CMD_TOGGLE_TIMESTAMPS
+from .constants import CTRL_H
+from .constants import TAG_CMD
+from .constants import TAG_KEY
+from .key_config import CHIP_RESET_BOOTLOADER_KEY
+from .key_config import CHIP_RESET_KEY
+from .key_config import COMMAND_KEYS
+from .key_config import EXIT_KEY
+from .key_config import EXIT_MENU_KEY
+from .key_config import MENU_KEY
+from .key_config import RECOMPILE_UPLOAD_APP_KEY
+from .key_config import RECOMPILE_UPLOAD_KEY
+from .key_config import SKIP_MENU_KEY
+from .key_config import TOGGLE_LOG_KEY
+from .key_config import TOGGLE_OUTPUT_KEY
+from .key_config import TOGGLE_TIMESTAMPS_KEY
+from .output_helpers import COMMON_PREFIX
+from .output_helpers import error_print
+from .output_helpers import red_print
 
 key_description = miniterm.key_description
 
@@ -45,8 +62,7 @@ def prompt_next_action(reason, console, console_parser, event_queue, cmd_queue):
             cmd_queue.put(ret)
 
 
-class ConsoleParser(object):
-
+class ConsoleParser:
     def __init__(self, eol='CRLF'):  # type: (str) -> None
         self.translate_eol = {
             'CRLF': lambda c: c.replace('\n', '\r\n'),
@@ -80,8 +96,8 @@ class ConsoleParser(object):
         elif c == RECOMPILE_UPLOAD_KEY:  # Recompile & upload
             ret = (TAG_CMD, CMD_MAKE)
         elif c in [RECOMPILE_UPLOAD_APP_KEY, 'a', 'A']:  # Recompile & upload app only
-            # "CTRL-A" cannot be captured with the default settings of the Windows command line, therefore, "A" can be used
-            # instead
+            # "CTRL-A" cannot be captured with the default settings of the Windows command line, therefore,
+            # "A" can be used instead
             ret = (TAG_CMD, CMD_APP_FLASH)
         elif c == TOGGLE_OUTPUT_KEY:  # Toggle output display
             ret = (TAG_CMD, CMD_OUTPUT_TOGGLE)
@@ -117,13 +133,13 @@ class ConsoleParser(object):
             {COMMON_PREFIX}    {key_description(TOGGLE_LOG_KEY):14} Toggle saving output into file
             {COMMON_PREFIX}    {key_description(TOGGLE_TIMESTAMPS_KEY) + ' (or I)':14} Toggle printing timestamps
             {COMMON_PREFIX}    {key_description(CHIP_RESET_BOOTLOADER_KEY):14} Reset target into bootloader via the DTR/RTS lines
-            {COMMON_PREFIX}    {key_description(EXIT_MENU_KEY) + ' (or X)':14} Exit program"""
+            {COMMON_PREFIX}    {key_description(EXIT_MENU_KEY) + ' (or X)':14} Exit program"""  # noqa: E501
 
         if SKIP_MENU_KEY:
             text += f"""
             {COMMON_PREFIX}
             {COMMON_PREFIX} Using the "skip_menu_key" option from a config file. Commands can be executed without pressing the menu escape key.
-            """
+            """  # noqa: E501
         return textwrap.dedent(text)
 
     def get_next_action_text(self):  # type: () -> str
@@ -142,7 +158,7 @@ class ConsoleParser(object):
         elif c == RECOMPILE_UPLOAD_KEY:  # Recompile & upload
             ret = (TAG_CMD, CMD_MAKE)
         elif c in [RECOMPILE_UPLOAD_APP_KEY, 'a', 'A']:  # Recompile & upload app only
-            # "CTRL-A" cannot be captured with the default settings of the Windows command line, therefore, "A" can be used
-            # instead
+            # "CTRL-A" cannot be captured with the default settings of the Windows command line, therefore,
+            # "A" can be used instead
             ret = (TAG_CMD, CMD_APP_FLASH)
         return ret

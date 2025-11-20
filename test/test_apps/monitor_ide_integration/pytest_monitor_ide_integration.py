@@ -11,11 +11,11 @@ from typing import List
 import pexpect
 import pytest
 from pytest_embedded import Dut
-from SimpleWebSocketServer import SimpleWebSocketServer, WebSocket
+from SimpleWebSocketServer import SimpleWebSocketServer
+from SimpleWebSocketServer import WebSocket
 
 
 class IDEWSProtocol(WebSocket):
-
     def handleMessage(self) -> None:
         try:
             j = json.loads(self.data)
@@ -23,8 +23,7 @@ class IDEWSProtocol(WebSocket):
             logging.info(f'Server ignores error: {e}')
             return
         event = j.get('event')
-        if event and 'prog' in j and ((event == 'gdb_stub' and 'port' in j) or
-                                      (event == 'coredump' and 'file' in j)):
+        if event and 'prog' in j and ((event == 'gdb_stub' and 'port' in j) or (event == 'coredump' and 'file' in j)):
             payload = {'event': 'debug_finished'}
             self.sendMessage(json.dumps(payload))
             logging.info(f'Server sent: {payload}')
@@ -38,7 +37,7 @@ class IDEWSProtocol(WebSocket):
         logging.info(f'{self.address} closed the connection')
 
 
-class WebSocketServer(object):
+class WebSocketServer:
     HOST = '127.0.0.1'
 
     def run(self, port) -> None:
@@ -75,22 +74,31 @@ def webSocketServer():
 @pytest.mark.esp32
 @pytest.mark.generic
 @pytest.mark.parametrize('config', ['gdb_stub', 'coredump'], indirect=True)
-def test_monitor_ide_integration(config: str, coverage_run: List[str], dut: Dut, webSocketServer: WebSocketServer) -> None:
+def test_monitor_ide_integration(
+    config: str, coverage_run: List[str], dut: Dut, webSocketServer: WebSocketServer
+) -> None:
     # The port needs to be closed because esp_idf_monitor will connect to it
     dut.serial.close()
 
-    monitor_cmd = ' '.join(itertools.chain(
-        coverage_run,
-        ['-m', 'esp_idf_monitor', os.path.join(dut.app.binary_path, 'panic.elf'), '--port', str(dut.serial.port),
-         '--ws', f'ws://{webSocketServer.HOST}:{webSocketServer.port.value}']
-    ))
+    monitor_cmd = ' '.join(
+        itertools.chain(
+            coverage_run,
+            [
+                '-m',
+                'esp_idf_monitor',
+                os.path.join(dut.app.binary_path, 'panic.elf'),
+                '--port',
+                str(dut.serial.port),
+                '--ws',
+                f'ws://{webSocketServer.HOST}:{webSocketServer.port.value}',
+            ],
+        )
+    )
     monitor_log_path = os.path.join(dut.logdir, 'monitor.txt')
 
-    with open(monitor_log_path, 'w') as log, pexpect.spawn(monitor_cmd,
-                                                           logfile=log,
-                                                           timeout=5,
-                                                           encoding='utf-8',
-                                                           codec_errors='ignore') as p:
+    with open(monitor_log_path, 'w') as log, pexpect.spawn(
+        monitor_cmd, logfile=log, timeout=5, encoding='utf-8', codec_errors='ignore'
+    ) as p:
         p.expect(re.compile(r'Guru Meditation Error'), timeout=10)
         p.expect_exact('--- Communicating through WebSocket')
         # The elements of dictionary can be printed in different order depending on the Python version.
@@ -110,17 +118,17 @@ def test_monitor_decode(config: str, coverage_run: List[str], dut: Dut) -> None:
     # The port needs to be closed because esp_idf_monitor will connect to it
     dut.serial.close()
 
-    monitor_cmd = ' '.join(itertools.chain(
-        coverage_run,
-        ['-m', 'esp_idf_monitor', os.path.join(dut.app.binary_path, 'panic.elf'), '--port', str(dut.serial.port)]
-    ))
+    monitor_cmd = ' '.join(
+        itertools.chain(
+            coverage_run,
+            ['-m', 'esp_idf_monitor', os.path.join(dut.app.binary_path, 'panic.elf'), '--port', str(dut.serial.port)],
+        )
+    )
     monitor_log_path = os.path.join(dut.logdir, 'monitor.txt')
 
-    with open(monitor_log_path, 'w') as log, pexpect.spawn(monitor_cmd,
-                                                           logfile=log,
-                                                           timeout=5,
-                                                           encoding='utf-8',
-                                                           codec_errors='ignore') as p:
+    with open(monitor_log_path, 'w') as log, pexpect.spawn(
+        monitor_cmd, logfile=log, timeout=5, encoding='utf-8', codec_errors='ignore'
+    ) as p:
         p.expect(re.compile(r'Guru Meditation Error'), timeout=10)
         if config == 'gdb_stub':
             p.expect_exact('Entering gdb stub now.')

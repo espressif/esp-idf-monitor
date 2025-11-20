@@ -10,8 +10,11 @@ import serial
 from serial.tools import list_ports
 
 from esp_idf_monitor.base.chip_specific_config import get_chip_config
-from esp_idf_monitor.base.constants import HIGH, LOW, USB_JTAG_SERIAL_PID
-from esp_idf_monitor.base.output_helpers import error_print, note_print
+from esp_idf_monitor.base.constants import HIGH
+from esp_idf_monitor.base.constants import LOW
+from esp_idf_monitor.base.constants import USB_JTAG_SERIAL_PID
+from esp_idf_monitor.base.output_helpers import error_print
+from esp_idf_monitor.base.output_helpers import note_print
 from esp_idf_monitor.config import Config
 
 if os.name != 'nt':
@@ -28,7 +31,6 @@ if os.name != 'nt':
 
 
 class Reset:
-
     format_dict = {
         'D': 'self._setDTR({})',
         'R': 'self._setRTS({})',
@@ -85,9 +87,7 @@ class Reset:
         if not self.serial_instance.is_open:
             error_print('Serial port is not connected')
             return None
-        status = struct.unpack(
-            'I', fcntl.ioctl(self.serial_instance.fileno(), TIOCMGET, struct.pack('I', 0))
-        )[0]
+        status = struct.unpack('I', fcntl.ioctl(self.serial_instance.fileno(), TIOCMGET, struct.pack('I', 0)))[0]
         if dtr:
             status |= TIOCM_DTR
         else:
@@ -139,8 +139,12 @@ class Reset:
             # use traditional reset sequence
             self._setDTR(HIGH)  # IO0=HIGH
             self._setRTS(LOW)  # EN=LOW, chip in reset
-            time.sleep(self.chip_config['enter_boot_set'])  # timeouts taken from esptool.py, includes esp32r0 workaround. defaults: 0.1
+            time.sleep(
+                self.chip_config['enter_boot_set']
+            )  # timeouts taken from esptool.py, includes esp32r0 workaround. defaults: 0.1
             self._setDTR(LOW)  # IO0=LOW
             self._setRTS(HIGH)  # EN=HIGH, chip out of reset
-            time.sleep(self.chip_config['enter_boot_unset'])  # timeouts taken from esptool.py, includes esp32r0 workaround. defaults: 0.05
+            time.sleep(
+                self.chip_config['enter_boot_unset']
+            )  # timeouts taken from esptool.py, includes esp32r0 workaround. defaults: 0.05
             self._setDTR(HIGH)  # IO0=HIGH, done

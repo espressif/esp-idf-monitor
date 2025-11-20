@@ -29,44 +29,62 @@ import subprocess
 import sys
 import threading
 import time
-from typing import Any, List, NoReturn, Optional, Type, Union  # noqa: F401
+from typing import List  # noqa: F401
+from typing import NoReturn  # noqa: F401
+from typing import Optional  # noqa: F401
+from typing import Type  # noqa: F401
+from typing import Union  # noqa: F401
 
 import serial
-from serial.tools import list_ports, miniterm
+from serial.tools import list_ports
+from serial.tools import miniterm
 
 from esp_idf_monitor import __version__
+
 # Windows console stuff
 from esp_idf_monitor.base.ansi_color_converter import get_ansi_converter
 from esp_idf_monitor.base.argument_parser import get_parser
 from esp_idf_monitor.base.console_parser import ConsoleParser
 from esp_idf_monitor.base.console_reader import ConsoleReader
-from esp_idf_monitor.base.constants import (CTRL_C, CTRL_H,
-                                            DEFAULT_PRINT_FILTER,
-                                            DEFAULT_TARGET_RESET,
-                                            DEFAULT_TOOLCHAIN_PREFIX,
-                                            ESPPORT_ENVIRON,
-                                            ESPTOOL_OPEN_PORT_ATTEMPTS_ENVIRON,
-                                            EVENT_QUEUE_TIMEOUT,
-                                            FILTERED_PORTS, GDB_EXIT_TIMEOUT,
-                                            GDB_UART_CONTINUE_COMMAND,
-                                            LAST_LINE_THREAD_INTERVAL,
-                                            MAKEFLAGS_ENVIRON,
-                                            PANIC_DECODE_DISABLE, PANIC_IDLE,
-                                            TAG_CMD, TAG_KEY, TAG_SERIAL,
-                                            TAG_SERIAL_FLUSH)
-from esp_idf_monitor.base.coredump import COREDUMP_DECODE_INFO, CoreDump
+from esp_idf_monitor.base.constants import CTRL_C
+from esp_idf_monitor.base.constants import CTRL_H
+from esp_idf_monitor.base.constants import DEFAULT_PRINT_FILTER
+from esp_idf_monitor.base.constants import DEFAULT_TARGET_RESET
+from esp_idf_monitor.base.constants import DEFAULT_TOOLCHAIN_PREFIX
+from esp_idf_monitor.base.constants import ESPPORT_ENVIRON
+from esp_idf_monitor.base.constants import ESPTOOL_OPEN_PORT_ATTEMPTS_ENVIRON
+from esp_idf_monitor.base.constants import EVENT_QUEUE_TIMEOUT
+from esp_idf_monitor.base.constants import FILTERED_PORTS
+from esp_idf_monitor.base.constants import GDB_EXIT_TIMEOUT
+from esp_idf_monitor.base.constants import GDB_UART_CONTINUE_COMMAND
+from esp_idf_monitor.base.constants import LAST_LINE_THREAD_INTERVAL
+from esp_idf_monitor.base.constants import MAKEFLAGS_ENVIRON
+from esp_idf_monitor.base.constants import PANIC_DECODE_DISABLE
+from esp_idf_monitor.base.constants import PANIC_IDLE
+from esp_idf_monitor.base.constants import TAG_CMD
+from esp_idf_monitor.base.constants import TAG_KEY
+from esp_idf_monitor.base.constants import TAG_SERIAL
+from esp_idf_monitor.base.constants import TAG_SERIAL_FLUSH
+from esp_idf_monitor.base.coredump import COREDUMP_DECODE_INFO
+from esp_idf_monitor.base.coredump import CoreDump
 from esp_idf_monitor.base.exceptions import SerialStopException
 from esp_idf_monitor.base.gdbhelper import GDBHelper
-from esp_idf_monitor.base.key_config import EXIT_KEY, EXIT_MENU_KEY, MENU_KEY
+from esp_idf_monitor.base.key_config import EXIT_KEY
+from esp_idf_monitor.base.key_config import EXIT_MENU_KEY
+from esp_idf_monitor.base.key_config import MENU_KEY
 from esp_idf_monitor.base.line_matcher import LineMatcher
 from esp_idf_monitor.base.logger import Logger
-from esp_idf_monitor.base.output_helpers import (error_print, normal_print,
-                                                 note_print, warning_print)
+from esp_idf_monitor.base.output_helpers import error_print
+from esp_idf_monitor.base.output_helpers import normal_print
+from esp_idf_monitor.base.output_helpers import note_print
+from esp_idf_monitor.base.output_helpers import warning_print
 from esp_idf_monitor.base.rom_elf_getter import get_rom_elf_path
-from esp_idf_monitor.base.serial_handler import (SerialHandler,
-                                                 SerialHandlerNoElf, run_make)
-from esp_idf_monitor.base.serial_reader import (LinuxReader, Reader,
-                                                SerialReader)
+from esp_idf_monitor.base.serial_handler import SerialHandler
+from esp_idf_monitor.base.serial_handler import SerialHandlerNoElf
+from esp_idf_monitor.base.serial_handler import run_make
+from esp_idf_monitor.base.serial_reader import LinuxReader  # noqa: F401
+from esp_idf_monitor.base.serial_reader import Reader  # noqa: F401
+from esp_idf_monitor.base.serial_reader import SerialReader  # noqa: F401
 from esp_idf_monitor.base.web_socket_client import WebSocketClient
 from esp_idf_monitor.config import Config
 
@@ -115,14 +133,24 @@ class Monitor:
 
         self.elf_files = elf_files or []
         self.elf_exists = self._check_elfs()
-        self.logger = Logger(self.elf_files, self.console, timestamps, timestamp_format, enable_address_decoding,
-                             toolchain_prefix, rom_elf_file=rom_elf_file)
+        self.logger = Logger(
+            self.elf_files,
+            self.console,
+            timestamps,
+            timestamp_format,
+            enable_address_decoding,
+            toolchain_prefix,
+            rom_elf_file=rom_elf_file,
+        )
 
-        self.coredump = CoreDump(decode_coredumps, self.event_queue, self.logger, websocket_client,
-                                 self.elf_files) if self.elf_exists else None
+        self.coredump = (
+            CoreDump(decode_coredumps, self.event_queue, self.logger, websocket_client, self.elf_files)
+            if self.elf_exists
+            else None
+        )
 
         # allow for possibility the "make" arg is a list of arguments (for idf.py)
-        self.make = make if os.path.exists(make) else shlex.split(make)  # type: Any[Union[str, List[str]], str]
+        self.make = make if os.path.exists(make) else shlex.split(make)  # type: Union[str, List[str]]
         self.target = target
         self.timeout_cnt = 0
 
@@ -132,32 +160,57 @@ class Monitor:
             self.serial = serial_instance
             self.serial_reader = SerialReader(self.serial, self.event_queue, reset, open_port_attempts, target)  # type: Reader
 
-            self.gdb_helper = GDBHelper(toolchain_prefix, websocket_client, self.elf_files, self.serial.port,
-                                        self.serial.baudrate) if self.elf_exists else None
+            self.gdb_helper = (
+                GDBHelper(toolchain_prefix, websocket_client, self.elf_files, self.serial.port, self.serial.baudrate)
+                if self.elf_exists
+                else None
+            )
 
         else:
             socket_test_mode = False
 
             if len(self.elf_files) > 1:
-                warning_print(f'Found {len(self.elf_files)} ELF files, but Linux target only supports one. Using: {self.elf_files[0]}')
+                warning_print(
+                    f'Found {len(self.elf_files)} ELF files, but Linux target only supports one. '
+                    f'Using: {self.elf_files[0]}'
+                )
 
             if not os.path.exists(self.elf_files[0]):
-                error_print(f'ELF file {self.elf_files[0]} does not exist, cannot run monitor on Linux target. Please build the project first.')
+                error_print(
+                    f'ELF file {self.elf_files[0]} does not exist, cannot run monitor on Linux target. '
+                    'Please build the project first.'
+                )
                 sys.exit(1)
 
-            self.serial = subprocess.Popen(self.elf_files[0], stdin=subprocess.PIPE, stdout=subprocess.PIPE,
-                                           stderr=subprocess.STDOUT, bufsize=0)
+            self.serial = subprocess.Popen(
+                self.elf_files[0], stdin=subprocess.PIPE, stdout=subprocess.PIPE, stderr=subprocess.STDOUT, bufsize=0
+            )
             self.serial_reader = LinuxReader(self.serial, self.event_queue)
 
             self.gdb_helper = None
 
         cls = SerialHandler if self.elf_exists else SerialHandlerNoElf
-        self.serial_handler = cls(b'', socket_test_mode, self.logger, decode_panic, PANIC_IDLE, b'', target,
-                                  False, False, self.serial, encrypted, self.elf_files, toolchain_prefix, disable_auto_color)
+        self.serial_handler = cls(
+            b'',
+            socket_test_mode,
+            self.logger,
+            decode_panic,
+            PANIC_IDLE,
+            b'',
+            target,
+            False,
+            False,
+            self.serial,
+            encrypted,
+            self.elf_files,
+            toolchain_prefix,
+            disable_auto_color,
+        )
 
         self.console_parser = ConsoleParser(eol)
-        self.console_reader = ConsoleReader(self.console, self.event_queue, self.cmd_queue, self.console_parser,
-                                            socket_test_mode)
+        self.console_reader = ConsoleReader(
+            self.console, self.event_queue, self.cmd_queue, self.console_parser, socket_test_mode
+        )
 
         self._line_matcher = LineMatcher(print_filter)
 
@@ -165,7 +218,7 @@ class Monitor:
         self._invoke_processing_last_line_timer = None  # type: Optional[threading.Timer]
 
     def __enter__(self) -> None:
-        """ Use 'with self' to temporarily disable monitoring behaviour """
+        """Use 'with self' to temporarily disable monitoring behaviour"""
         self.serial_reader.stop()
         self.console_reader.stop()
 
@@ -184,8 +237,9 @@ class Monitor:
 
     def run_make(self, target: str) -> None:
         with self:
-            run_make(target, self.make, self.console, self.console_parser, self.event_queue, self.cmd_queue,
-                     self.logger)
+            run_make(
+                target, self.make, self.console, self.console_parser, self.event_queue, self.cmd_queue, self.logger
+            )
 
     def _pre_start(self) -> None:
         self.console_reader.start()
@@ -200,8 +254,8 @@ class Monitor:
                     self._main_loop()
                 except KeyboardInterrupt:
                     note_print(
-                        f'To exit from IDF monitor please use \"{key_description(EXIT_KEY)}\". '
-                        f'Alternatively, you can use {key_description(MENU_KEY)} {key_description(EXIT_MENU_KEY)} to exit.'
+                        f'To exit from IDF monitor please use "{key_description(EXIT_KEY)}". Alternatively, '
+                        f'you can use {key_description(MENU_KEY)} {key_description(EXIT_MENU_KEY)} to exit.'
                     )
                     self.serial_write(codecs.encode(CTRL_C))
         except SerialStopException:
@@ -220,7 +274,7 @@ class Monitor:
                 pass
             normal_print('\n')
 
-    def serial_write(self, *args: str, **kwargs: str) -> None:
+    def serial_write(self, *args: bytes, **kwargs: str) -> None:
         raise NotImplementedError
 
     def check_gdb_stub_and_run(self, line: bytes) -> None:
@@ -240,18 +294,25 @@ class Monitor:
 
         event_tag, data = item
         if event_tag == TAG_CMD:
-            self.serial_handler.handle_commands(data, self.target, self.run_make, self.console_reader,
-                                                self.serial_reader)
+            self.serial_handler.handle_commands(
+                data, self.target, self.run_make, self.console_reader, self.serial_reader
+            )
         elif event_tag == TAG_KEY:
             self.serial_write(codecs.encode(data))
         elif event_tag == TAG_SERIAL:
-            self.serial_handler.handle_serial_input(data, self.console_parser, self.coredump,  # type: ignore
-                                                    self.gdb_helper, self._line_matcher,
-                                                    self.check_gdb_stub_and_run)
+            self.serial_handler.handle_serial_input(
+                data,
+                self.console_parser,
+                self.coredump,  # type: ignore
+                self.gdb_helper,
+                self._line_matcher,
+                self.check_gdb_stub_and_run,
+            )
             if self._invoke_processing_last_line_timer is not None:
                 self._invoke_processing_last_line_timer.cancel()
-            self._invoke_processing_last_line_timer = threading.Timer(LAST_LINE_THREAD_INTERVAL,
-                                                                      self.invoke_processing_last_line)
+            self._invoke_processing_last_line_timer = threading.Timer(
+                LAST_LINE_THREAD_INTERVAL, self.invoke_processing_last_line
+            )
             self._invoke_processing_last_line_timer.start()
             # If no further data is received in the next short period
             # of time then the _invoke_processing_last_line_timer
@@ -262,17 +323,22 @@ class Monitor:
             # the espcoredump loader uses empty line as a sign for end-of-coredump
             # line is finalized only for non coredump data
         elif event_tag == TAG_SERIAL_FLUSH:
-            self.serial_handler.handle_serial_input(data, self.console_parser, self.coredump,  # type: ignore
-                                                    self.gdb_helper, self._line_matcher,
-                                                    self.check_gdb_stub_and_run,
-                                                    finalize_line=not self.coredump or not self.coredump.in_progress)
+            self.serial_handler.handle_serial_input(
+                data,
+                self.console_parser,
+                self.coredump,  # type: ignore
+                self.gdb_helper,
+                self._line_matcher,
+                self.check_gdb_stub_and_run,
+                finalize_line=not self.coredump or not self.coredump.in_progress,
+            )
         else:
-            raise RuntimeError('Bad event data %r' % ((event_tag, data),))
+            raise RuntimeError(f'Bad event data {((event_tag, data),)}')
 
 
 class SerialMonitor(Monitor):
     def __exit__(self, exc_type, exc_val, exc_tb) -> None:  # type: ignore
-        """ Use 'with self' to temporarily disable monitoring behaviour """
+        """Use 'with self' to temporarily disable monitoring behaviour"""
         self.console_reader.start()
         if self.elf_exists:
             self.serial_reader.gdb_exit = self.gdb_helper.gdb_exit  # type: ignore # write gdb_exit flag
@@ -284,15 +350,17 @@ class SerialMonitor(Monitor):
             self.gdb_helper.gdb_exit = False  # type: ignore
         self.serial_handler.start_cmd_sent = False
 
-    def serial_write(self, *args: str, **kwargs: str) -> None:
+    def serial_write(self, *args: bytes, **kwargs: str) -> None:
         self.serial: serial.Serial
         try:
             self.serial.write(*args, **kwargs)
             self.timeout_cnt = 0
         except serial.SerialTimeoutException:
             if not self.timeout_cnt:
-                warning_print('Writing to serial is timing out. Please make sure that your application supports '
-                              'an interactive console and that you have picked the correct console for serial communication.')
+                warning_print(
+                    'Writing to serial is timing out. Please make sure that your application supports '
+                    'an interactive console and that you have picked the correct console for serial communication.'
+                )
             self.timeout_cnt += 1
             self.timeout_cnt %= 3
         except serial.SerialException:
@@ -318,11 +386,11 @@ class SerialMonitor(Monitor):
 
 class LinuxMonitor(Monitor):
     def __exit__(self, exc_type, exc_val, exc_tb) -> None:  # type: ignore
-        """ Use 'with self' to temporarily disable monitoring behaviour """
+        """Use 'with self' to temporarily disable monitoring behaviour"""
         self.console_reader.start()
         self.serial_reader.start()
 
-    def serial_write(self, *args: str, **kwargs: str) -> None:
+    def serial_write(self, *args: bytes, **kwargs: str) -> None:
         self.serial.stdin.write(*args, **kwargs)
         self.serial.stdin.flush()
 
@@ -335,11 +403,7 @@ def detect_port() -> Union[str, NoReturn]:
     try:
         port_list = list_ports.comports()
         if sys.platform == 'darwin':
-            port_list = [
-                port
-                for port in port_list
-                if not port.device.endswith(FILTERED_PORTS)
-            ]
+            port_list = [port for port in port_list if not port.device.endswith(FILTERED_PORTS)]
         port: str = port_list[-1].device
         # keep the `/dev/ttyUSB0` default port on linux if connected
         # TODO: This can be removed in next major release and some
@@ -369,7 +433,9 @@ def main() -> None:
         rom_elf_file = args.rom_elf_file.name
         args.rom_elf_file.close()  # don't need this as a file
     else:
-        rom_elf_file = args.rom_elf_file if args.rom_elf_file is not None else get_rom_elf_path(args.target, args.revision)
+        rom_elf_file = (
+            args.rom_elf_file if args.rom_elf_file is not None else get_rom_elf_path(args.target, args.revision)
+        )
 
     # remove the parallel jobserver arguments from MAKEFLAGS, as any
     # parent make is only running 1 job (monitor), so we can re-spawn
@@ -419,35 +485,40 @@ def main() -> None:
             # has a check for this).
             # To make sure the key as well as the value are str type, by the requirements of subprocess
             espport_val = str(args.port)
-            os.environ.update({ESPPORT_ENVIRON: espport_val, ESPTOOL_OPEN_PORT_ATTEMPTS_ENVIRON: str(args.open_port_attempts)})
+            os.environ.update(
+                {ESPPORT_ENVIRON: espport_val, ESPTOOL_OPEN_PORT_ATTEMPTS_ENVIRON: str(args.open_port_attempts)}
+            )
 
             cls = SerialMonitor
-            note_print('esp-idf-monitor {v} on {p.name} {p.baudrate}'.format(v=__version__, p=serial_instance))
+            note_print(f'esp-idf-monitor {__version__} on {serial_instance.name} {serial_instance.baudrate}')
 
-        monitor = cls(serial_instance,
-                      args.elf_files,
-                      args.print_filter,
-                      args.make,
-                      args.encrypted,
-                      not args.no_reset,
-                      args.open_port_attempts,
-                      args.toolchain_prefix,
-                      args.eol,
-                      args.decode_coredumps,
-                      args.decode_panic,
-                      args.target,
-                      ws,
-                      not args.disable_address_decoding,
-                      args.timestamps,
-                      args.timestamp_format,
-                      args.force_color,
-                      args.disable_auto_color,
-                      rom_elf_file)
+        monitor = cls(
+            serial_instance,
+            args.elf_files,
+            args.print_filter,
+            args.make,
+            args.encrypted,
+            not args.no_reset,
+            args.open_port_attempts,
+            args.toolchain_prefix,
+            args.eol,
+            args.decode_coredumps,
+            args.decode_panic,
+            args.target,
+            ws,
+            not args.disable_address_decoding,
+            args.timestamps,
+            args.timestamp_format,
+            args.force_color,
+            args.disable_auto_color,
+            rom_elf_file,
+        )
 
-        note_print('Quit: {q} | Menu: {m} | Help: {m} followed by {h}'.format(
-            q=key_description(EXIT_KEY),
-            m=key_description(MENU_KEY),
-            h=key_description(CTRL_H)))
+        note_print(
+            'Quit: {q} | Menu: {m} | Help: {m} followed by {h}'.format(
+                q=key_description(EXIT_KEY), m=key_description(MENU_KEY), h=key_description(CTRL_H)
+            )
+        )
         if args.print_filter != DEFAULT_PRINT_FILTER:
             msg = ''
             # Check if environment variable was used to set print_filter

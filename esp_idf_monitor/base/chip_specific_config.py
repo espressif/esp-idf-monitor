@@ -32,9 +32,8 @@ conf = {
             'reset': MINIMAL_EN_LOW_DELAY,
             'enter_boot_set': 0.1,
             'enter_boot_unset': 0.05,
-        }
+        },
     },
-
 }
 
 

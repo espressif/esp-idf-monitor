@@ -10,18 +10,19 @@ import time
 from serial.tools.miniterm import Console  # noqa: F401
 
 from .console_parser import ConsoleParser  # noqa: F401
-from .constants import CMD_STOP, TAG_CMD
+from .constants import CMD_STOP
+from .constants import TAG_CMD
 from .stoppable_thread import StoppableThread
 
 
 class ConsoleReader(StoppableThread):
-    """ Read input keys from the console and push them to the queue,
+    """Read input keys from the console and push them to the queue,
     until stopped.
     """
 
     def __init__(self, console, event_queue, cmd_queue, parser, test_mode):
         # type: (Console, queue.Queue, queue.Queue, ConsoleParser, bool) -> None
-        super(ConsoleReader, self).__init__()
+        super().__init__()
         self.console = console
         self.event_queue = event_queue
         self.cmd_queue = cmd_queue
@@ -33,6 +34,7 @@ class ConsoleReader(StoppableThread):
             # results in Critical Error in Windows: https://github.com/espressif/esp-idf/issues/12162
             # Note: UTF-8 characters seem to work even without this setting
             import ctypes
+
             ctypes.windll.kernel32.SetConsoleOutputCP(console._saved_ocp)
             ctypes.windll.kernel32.SetConsoleCP(console._saved_icp)
 
@@ -43,6 +45,7 @@ class ConsoleReader(StoppableThread):
             # Use non-blocking busy read to avoid using insecure TIOCSTI from console.cancel().
             # TIOCSTI is not supported on kernels newer than 6.2.
             import termios
+
             new = termios.tcgetattr(self.console.fd)
             # new[6] - 'cc': a list of the tty special characters
             new[6][termios.VMIN] = 0  # minimum bytes to read
@@ -57,6 +60,7 @@ class ConsoleReader(StoppableThread):
                         #
                         # So we only call getkey() if we know there's a key waiting for us.
                         import msvcrt
+
                         while not msvcrt.kbhit() and self.alive:  # type: ignore
                             time.sleep(0.1)
                         if not self.alive:

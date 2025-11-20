@@ -14,10 +14,14 @@ from esp_idf_monitor import __version__
 @pytest.mark.generic
 @pytest.mark.linux
 def test_linux_target(coverage_run: List[str], dut: Dut) -> None:
-    monitor_cmd = ' '.join(itertools.chain(coverage_run, ['-m', 'esp_idf_monitor', dut.serial.app.elf_file, '--target', 'linux']))
+    monitor_cmd = ' '.join(
+        itertools.chain(coverage_run, ['-m', 'esp_idf_monitor', dut.serial.app.elf_file, '--target', 'linux'])
+    )
     monitor_log_path = os.path.join(dut.logdir, 'monitor.txt')
 
-    with open(monitor_log_path, 'w') as log, pexpect.spawn(monitor_cmd, logfile=log, timeout=5, encoding='utf-8', codec_errors='ignore') as p:
+    with open(monitor_log_path, 'w') as log, pexpect.spawn(
+        monitor_cmd, logfile=log, timeout=5, encoding='utf-8', codec_errors='ignore'
+    ) as p:
         p.expect_exact(f'--- esp-idf-monitor {__version__} on linux')
         p.expect_exact('Hello world!')
         # try some unsupported command for linux e.g. resetting the target

@@ -4,12 +4,13 @@
 import re
 
 
-class LineMatcher(object):
+class LineMatcher:
     """
     Assembles a dictionary of filtering rules based on the --print_filter
     argument of idf_monitor. Then later it is used to match lines and
     determine whether they should be shown on screen or not.
     """
+
     LEVEL_N = 0
     LEVEL_E = 1
     LEVEL_W = 2
@@ -17,8 +18,16 @@ class LineMatcher(object):
     LEVEL_D = 4
     LEVEL_V = 5
 
-    level = {'N': LEVEL_N, 'E': LEVEL_E, 'W': LEVEL_W, 'I': LEVEL_I, 'D': LEVEL_D,
-             'V': LEVEL_V, '*': LEVEL_V, '': LEVEL_V}
+    level = {
+        'N': LEVEL_N,
+        'E': LEVEL_E,
+        'W': LEVEL_W,
+        'I': LEVEL_I,
+        'D': LEVEL_D,
+        'V': LEVEL_V,
+        '*': LEVEL_V,
+        '': LEVEL_V,
+    }
 
     def __init__(self, print_filter):
         # type: (str) -> None
