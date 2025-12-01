@@ -5,7 +5,7 @@ default_stages: ["pre-commit"]
 exclude: test/tests
 repos:
   - repo: https://github.com/pre-commit/pre-commit-hooks
-    rev: v3.4.0
+    rev: v6.0.0
     hooks:
       - id: end-of-file-fixer
         exclude: ^test/host_test/inputs
@@ -18,31 +18,31 @@ repos:
       - id: double-quote-string-fixer
 
   - repo: https://github.com/pycqa/flake8
-    rev: 4.0.1
+    rev: 7.3.0
     hooks:
       - id: flake8
         args: ['--config=.flake8']
 
   - repo: https://github.com/pycqa/isort
-    rev: 5.11.5
+    rev: 7.0.0
     hooks:
       - id: isort
         name: isort (python)
 
   - repo: https://github.com/pre-commit/mirrors-mypy
-    rev: 'v0.942'
+    rev: 'v1.19.0'
     hooks:
     -   id: mypy
 
   - repo: https://github.com/codespell-project/codespell
-    rev: v2.2.5
+    rev: v2.4.1
     hooks:
     - id: codespell
       additional_dependencies:
         - tomli
 
   - repo: https://github.com/espressif/conventional-precommit-linter
-    rev: v1.2.1
+    rev: v1.10.0
     hooks:
       - id: conventional-precommit-linter
         stages: [commit-msg]
