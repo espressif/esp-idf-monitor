@@ -45,7 +45,7 @@ class Config:
                     unknown_options = list(set(config.options(self.config_name)) - set(VALID_OPTIONS))
                     unknown_options.sort()
                     if len(unknown_options) != 0:
-                        note_print(f"Ignoring unknown configuration options: {', '.join(unknown_options)}")
+                        note_print(f'Ignoring unknown configuration options: {", ".join(unknown_options)}')
                 return True
         except (UnicodeDecodeError, configparser.Error) as e:
             if verbose:
@@ -87,7 +87,5 @@ class Config:
             config.read(config_file_path)
             if verbose:
                 msg = f' (set with {self.env_var_name} environment variable)' if set_with_env_var else ''
-                note_print(
-                    f'Loaded custom configuration from {os.path.abspath(config_file_path)}{msg}'
-                )
+                note_print(f'Loaded custom configuration from {os.path.abspath(config_file_path)}{msg}')
         return config, config_file_path

@@ -4,7 +4,8 @@
 import json
 import time
 
-from .output_helpers import error_print, note_print
+from .output_helpers import error_print
+from .output_helpers import note_print
 
 try:
     import websocket
@@ -13,7 +14,7 @@ except ImportError:
     pass
 
 
-class WebSocketClient(object):
+class WebSocketClient:
     """
     WebSocket client used to advertise debug events to WebSocket server by sending and receiving JSON-serialized
     dictionaries.

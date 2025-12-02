@@ -10,7 +10,7 @@ def pytest_addoption(parser):
         '--output',
         action='store',
         default=os.path.join(os.path.abspath(os.path.dirname(__file__)), 'outputs'),
-        help='Output directory for writing STDOUT and STDERR from tests'
+        help='Output directory for writing STDOUT and STDERR from tests',
     )
 
 

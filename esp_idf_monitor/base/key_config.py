@@ -18,8 +18,10 @@ def key_to_hex(key: Optional[str], default: str) -> str:
     # convert key from string to C0 escape code
     C0_code = ascii_code - ord('@')
     if C0_code < 1 or C0_code > 32:
-        error_print(f"Unsupported configuration for key: '{key}', please use just the English alphabet "
-                    f"characters (A-Z) and [,],\\,^,_. Using the default option '{default}'.")
+        error_print(
+            f"Unsupported configuration for key: '{key}', please use just the English alphabet "
+            f"characters (A-Z) and [,],\\,^,_. Using the default option '{default}'."
+        )
         C0_code = ord(default) - ord('@')
     return chr(C0_code)
 
@@ -46,5 +48,5 @@ COMMAND_KEYS = [
     TOGGLE_TIMESTAMPS_KEY,
     CHIP_RESET_BOOTLOADER_KEY,
     EXIT_MENU_KEY,
-    SKIP_MENU_KEY
+    SKIP_MENU_KEY,
 ]

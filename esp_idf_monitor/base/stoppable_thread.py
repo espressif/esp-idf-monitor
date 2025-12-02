@@ -5,7 +5,7 @@ import threading
 from typing import Optional  # noqa: F401
 
 
-class StoppableThread(object):
+class StoppableThread:
     """
     Provide a Thread-like class which can be 'cancelled' via a subclass-provided
     cancellation method.

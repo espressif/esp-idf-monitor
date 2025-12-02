@@ -4,12 +4,17 @@ import io
 import os
 import queue  # noqa: F401
 import tempfile
-from contextlib import contextmanager, redirect_stdout
-from typing import Generator, List, Optional  # noqa: F401
+from contextlib import contextmanager
+from contextlib import redirect_stdout
+from typing import Generator  # noqa: F401
+from typing import List  # noqa: F401
+from typing import Optional  # noqa: F401
 
 from .constants import TAG_KEY
 from .logger import Logger  # noqa: F401
-from .output_helpers import error_print, note_print, warning_print
+from .output_helpers import error_print
+from .output_helpers import note_print
+from .output_helpers import warning_print
 from .web_socket_client import WebSocketClient  # noqa: F401
 
 # coredump related messages
@@ -45,8 +50,7 @@ class CoreDump:
 
     def _process_coredump(self):  # type: () -> None
         if self._decode_coredumps != COREDUMP_DECODE_INFO:
-            raise NotImplementedError('process_coredump: %s not implemented' % self._decode_coredumps)
-        coredump_file = None
+            raise NotImplementedError(f'process_coredump: {self._decode_coredumps} not implemented')
         # On Windows, the temporary file can't be read unless it is closed.
         # Set delete=False and delete the file manually later.
         with tempfile.NamedTemporaryFile(mode='wb', delete=False) as coredump_file:
@@ -56,15 +60,14 @@ class CoreDump:
         if self.websocket_client:
             self.logger.output_enabled = True
             note_print('Communicating through WebSocket')
-            self.websocket_client.send({'event': 'coredump',
-                                        'file': coredump_file.name,
-                                        'prog': self.elf_files})
+            self.websocket_client.send({'event': 'coredump', 'file': coredump_file.name, 'prog': self.elf_files})
             note_print('Waiting for debug finished event')
             self.websocket_client.wait([('event', 'debug_finished')])
             note_print('Communications through WebSocket is finished')
         else:
             try:
                 import esp_coredump
+
                 coredump = esp_coredump.CoreDump(core=coredump_file.name, core_format='b64', prog=self.elf_files)
                 f = io.StringIO()
                 with redirect_stdout(f):
@@ -74,8 +77,7 @@ class CoreDump:
                 self.logger.print(output.encode('utf-8'))
                 self.logger.output_enabled = False  # Will be re-enabled in check_coredump_trigger_after_print
             except ImportError as e:
-                warning_print('Failed to parse core dump info: '
-                              f'Module {e.name} is not installed\n\n')
+                warning_print(f'Failed to parse core dump info: Module {e.name} is not installed\n\n')
                 self._print_unprocessed_coredump()
             except (Exception, SystemExit) as e:
                 error_print(f'Failed to parse core dump info: {e}\n\n')
@@ -85,7 +87,7 @@ class CoreDump:
             try:
                 os.unlink(coredump_file.name)
             except OSError as e:
-                warning_print(f'Couldn\'t remote temporary core dump file ({e})')
+                warning_print(f"Couldn't remote temporary core dump file ({e})")
 
     def _print_unprocessed_coredump(self) -> None:
         """Print unprocessed core dump data if there was any issue during processing."""
@@ -118,7 +120,7 @@ class CoreDump:
             self._coredump_buffer += line.replace(b'\r', b'') + b'\n'
             new_buffer_len_kb = len(self._coredump_buffer) // kb
             if new_buffer_len_kb > buffer_len_kb:
-                note_print('Received %3d kB...' % new_buffer_len_kb, newline='\r')
+                note_print(f'Received {new_buffer_len_kb:3d} kB...', newline='\r')
 
     def _check_coredump_trigger_after_print(self):  # type: () -> None
         if self._decode_coredumps == COREDUMP_DECODE_DISABLE:

@@ -3,22 +3,40 @@
 
 import datetime
 import os
-from typing import AnyStr, BinaryIO, Callable, List, Optional  # noqa: F401
+from typing import AnyStr  # noqa: F401
+from typing import BinaryIO  # noqa: F401
+from typing import Callable  # noqa: F401
+from typing import List  # noqa: F401
+from typing import Optional  # noqa: F401
 
 from esp_idf_panic_decoder import PcAddressDecoder
 from serial.tools import miniterm
 
-from esp_idf_monitor.base.key_config import MENU_KEY, TOGGLE_OUTPUT_KEY
+from esp_idf_monitor.base.key_config import MENU_KEY
+from esp_idf_monitor.base.key_config import TOGGLE_OUTPUT_KEY
 
-from .output_helpers import (COMMON_PREFIX, error_print, green_print,
-                             normal_print, note_print, red_print, yellow_print)
+from .output_helpers import COMMON_PREFIX
+from .output_helpers import error_print
+from .output_helpers import green_print
+from .output_helpers import normal_print
+from .output_helpers import note_print
+from .output_helpers import red_print
+from .output_helpers import yellow_print
 
 key_description = miniterm.key_description
 
 
 class Logger:
-    def __init__(self, elf_files, console, timestamps, timestamp_format, enable_address_decoding,
-                 toolchain_prefix, rom_elf_file=None):
+    def __init__(
+        self,
+        elf_files,
+        console,
+        timestamps,
+        timestamp_format,
+        enable_address_decoding,
+        toolchain_prefix,
+        rom_elf_file=None,
+    ):
         # type: (List[str], miniterm.Console, bool, str, bool, str, Optional[str]) -> None
         self.log_file = None  # type: Optional[BinaryIO]
         self._output_enabled = True  # type: bool
@@ -66,8 +84,9 @@ class Logger:
 
     def start_logging(self):  # type: () -> None
         if not self._log_file:
-            name = 'log.{}.{}.txt'.format(os.path.splitext(os.path.basename(self.elf_file))[0],
-                                          datetime.datetime.now().strftime('%Y%m%d%H%M%S'))
+            name = 'log.{}.{}.txt'.format(
+                os.path.splitext(os.path.basename(self.elf_file))[0], datetime.datetime.now().strftime('%Y%m%d%H%M%S')
+            )
             try:
                 self.log_file = open(name, 'wb+')
                 note_print(f'Logging is enabled into file {name}', prefix='\n')
@@ -90,7 +109,7 @@ class Logger:
         if console_printer is None:
             console_printer = self.console.write_bytes
 
-        if isinstance(string, type(u'')):
+        if isinstance(string, str):
             new_line_char = '\n'
         else:
             new_line_char = b'\n'  # type: ignore
@@ -99,7 +118,7 @@ class Logger:
             t = datetime.datetime.now().strftime(self.timestamp_format)
 
             # "string" is not guaranteed to be a full line. Timestamps should be only at the beginning of lines.
-            if isinstance(string, type(u'')):
+            if isinstance(string, str):
                 line_prefix = t + ' '
             else:
                 line_prefix = t.encode('ascii') + b' '  # type: ignore
@@ -111,7 +130,7 @@ class Logger:
             # If the new output ends with a newline, remove it so that we don't add a trailing timestamp.
             self._start_of_line = string.endswith(new_line_char)
             if self._start_of_line:
-                string = string[:-len(new_line_char)]
+                string = string[: -len(new_line_char)]
 
             string = string.replace(new_line_char, new_line_char + line_prefix)
 
@@ -125,7 +144,7 @@ class Logger:
             console_printer(string)
         if self._log_file:
             try:
-                if isinstance(string, type(u'')):
+                if isinstance(string, str):
                     string = string.encode()  # type: ignore
                 self._log_file.write(string)  # type: ignore
             except Exception as e:
@@ -135,9 +154,12 @@ class Logger:
 
     def output_toggle(self):  # type: () -> None
         self.output_enabled = not self.output_enabled
-        note_print(f'Toggle output display: {self.output_enabled}, '
-                   f'Type {key_description(MENU_KEY)} {key_description(TOGGLE_OUTPUT_KEY)} '
-                   'to show/disable output again.', prefix='\n')
+        note_print(
+            f'Toggle output display: {self.output_enabled}, '
+            f'Type {key_description(MENU_KEY)} {key_description(TOGGLE_OUTPUT_KEY)} '
+            'to show/disable output again.',
+            prefix='\n',
+        )
 
     def handle_possible_pc_address_in_line(self, line: bytes, insert_new_line: bool = False) -> None:
         if not self.pc_address_decoder:

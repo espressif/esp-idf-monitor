@@ -2,10 +2,13 @@
 # SPDX-License-Identifier: Apache-2.0
 import re
 import subprocess
-from typing import List, Optional  # noqa: F401
+from typing import List  # noqa: F401
+from typing import Optional  # noqa: F401
 
 from .logger import Logger  # noqa: F401
-from .output_helpers import error_print, normal_print, note_print
+from .output_helpers import error_print
+from .output_helpers import normal_print
+from .output_helpers import note_print
 from .web_socket_client import WebSocketClient  # noqa: F401
 
 
@@ -40,10 +43,14 @@ class GDBHelper:
         # type: () -> None
         normal_print('')
         try:
-            cmd = ['%sgdb' % self.toolchain_prefix,
-                   '-ex', 'set serial baud %d' % self.baud_rate,
-                   '-ex', 'target remote %s' % self.port,
-                   self.elf_files[0]]
+            cmd = [
+                f'{self.toolchain_prefix}gdb',
+                '-ex',
+                f'set serial baud {self.baud_rate}',
+                '-ex',
+                f'target remote {self.port}',
+                self.elf_files[0],
+            ]
             for elf_file in self.elf_files[1:]:
                 cmd.append('-ex')
                 cmd.append(f'add-symbol-file {elf_file}')
@@ -53,7 +60,7 @@ class GDBHelper:
                 process = subprocess.Popen(cmd, cwd='.')
             except KeyboardInterrupt:
                 pass
-            # We ignore Ctrl+C interrupt form external process abd wait response util GDB will be finished.
+            # We ignore Ctrl+C interrupt from external process and wait response util GDB will be finished.
             while True:
                 try:
                     process.wait()
@@ -62,7 +69,7 @@ class GDBHelper:
                     pass  # We ignore the Ctrl+C
             self.gdb_exit = True
         except OSError as e:
-            error_print(f"{' '.join(cmd)}: {e}")
+            error_print(f'{" ".join(cmd)}: {e}')
         except KeyboardInterrupt:
             pass  # happens on Windows, maybe other OSes
         finally:
@@ -91,14 +98,12 @@ class GDBHelper:
             if chsum == calc_chsum:
                 if self.websocket_client:
                     note_print('Communicating through WebSocket')
-                    self.websocket_client.send({'event': 'gdb_stub',
-                                                'port': self.port,
-                                                'prog': self.elf_files[0]})
+                    self.websocket_client.send({'event': 'gdb_stub', 'port': self.port, 'prog': self.elf_files[0]})
                     note_print('Waiting for debug finished event')
                     self.websocket_client.wait([('event', 'debug_finished')])
                     note_print('Communications through WebSocket is finished')
                 else:
                     return True
             else:
-                error_print('Malformed gdb message... calculated checksum %02x received %02x' % (chsum, calc_chsum))
+                error_print(f'Malformed gdb message... calculated checksum {chsum:02x} received {calc_chsum:02x}')
         return False

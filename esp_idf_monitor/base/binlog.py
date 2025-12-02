@@ -4,7 +4,11 @@
 import re
 import string
 import struct
-from typing import Any, List, Optional, Tuple, Union
+from typing import Any
+from typing import List
+from typing import Optional
+from typing import Tuple
+from typing import Union
 
 from elftools.elf.elffile import ELFFile
 
@@ -76,7 +80,7 @@ class Message:
     def retrieve_data_from_elf(self, addr: int, req_len: Optional[int] = None) -> bytes:
         def get_data(section, addr: int) -> Optional[bytes]:
             if section['sh_addr'] <= addr < section['sh_addr'] + section['sh_size']:
-                data: bytes = section.data()[addr - section['sh_addr']:]
+                data: bytes = section.data()[addr - section['sh_addr'] :]
                 end_offset = req_len if req_len is not None else data.find(b'\x00')
                 if len(data) and end_offset >= 0:
                     return data[:end_offset]
@@ -110,13 +114,13 @@ class Message:
         retrieved_data = struct.unpack_from(f'>{data_len}s', raw_args, struct.calcsize(data_len_format))[0]
         return retrieved_data, data_len
 
-    def retrieve_arguments(self, format: str, raw_args: bytes) -> List[Union[int, str, float, bytes]]:
+    def retrieve_arguments(self, format_str: str, raw_args: bytes) -> List[Union[int, str, float, bytes]]:
         args: List[Union[int, str, float, bytes]] = []
         i_str = 0
         i_arg = 0
         arg_formatter = ArgFormatter()
-        while i_str < len(format):
-            match = arg_formatter.c_format_regex.search(format, i_str)
+        while i_str < len(format_str):
+            match = arg_formatter.c_format_regex.search(format_str, i_str)
             if not match:
                 break
             i_str = match.end()
@@ -128,7 +132,9 @@ class Message:
             # **Handling String (%s, %S)**
             if specifier in 'sS':
                 if self.buffer_hex_log or self.buffer_char_log or self.buffer_hexdump_log:
-                    buffer_len = args[-1] if isinstance(args[-1], int) else None  # Previous argument is the buffer length
+                    buffer_len = (
+                        args[-1] if isinstance(args[-1], int) else None
+                    )  # Previous argument is the buffer length
                     data, data_len = self.retrieve_data(raw_args[i_arg:], buffer_len)
                     args.append(data)
                 else:
@@ -229,10 +235,10 @@ class BinaryLog:
             if self.detected(int(data[i])):
                 start_idx = i
                 try:
-                    control = Control(data[start_idx + 1:])
+                    control = Control(data[start_idx + 1 :])
                     if control.pkg_len > len(data[i:]):
                         break
-                    frame = data[start_idx:start_idx + control.pkg_len]
+                    frame = data[start_idx : start_idx + control.pkg_len]
                     if control.pkg_len != 0 and self.crc8(frame) == 0:
                         frames.append(frame)
                         idx_of_last_found_pkg = start_idx + control.pkg_len
@@ -320,14 +326,16 @@ class ArgFormatter(string.Formatter):
         # %llX      - length='ll', specifier='X'
         # %zu       - length='z', specifier='u'
         # %p        - specifier='p'
+        # fmt: off
         self.c_format_regex = re.compile(
             r'%%|'                          # (0) Match literal %%
             r'%(?P<flags>[-+0# ]*)?'        # (1) Flags: Optional, can include '-', '+', '0', '#', or ' ' (space)
             r'(?P<width>\*|\d+)?'           # (2) Width: Optional, specifies minimum field width (e.g., "10" in "%10d")
-            r'(\.(?P<precision>\*|\d+))?'   # (3) Precision: Optional, starts with '.', followed by digits (e.g., ".2" in "%.2f")
+            r'(\.(?P<precision>\*|\d+))?'   # (3) Precision: Optional, starts with '.', followed by digits (e.g., ".2" in "%.2f")  # noqa: E501
             r'(?P<length>hh|h|l|ll|z|j|t|L)?'  # (4) Length Modifier: Optional (e.g., "ll" in "%lld", "z" in "%zu")
             r'(?P<specifier>[diuoxXfFeEgGaAcsp])'  # (5) Specifier: Required (e.g., "d" for integers, "s" for strings)
         )
+        # fmt: on
 
     def format_field(self, value: Any, format_spec: str) -> Any:
         if 'o' in format_spec and '#' in format_spec:
@@ -357,8 +365,8 @@ class ArgFormatter(string.Formatter):
             # Convert precision for integers (`%.5d` -> `{:05d}`)
             if specifier in 'diouxX':
                 width = precision  # Precision becomes width for zero-padding
-                py_flags = '0'     # Force zero-padding
-                precision = None   # Remove precision (Python does not support it for ints)
+                py_flags = '0'  # Force zero-padding
+                precision = None  # Remove precision (Python does not support it for ints)
             else:
                 py_precision = '.' + precision
         py_specifier = self.convert_specifier(specifier)
@@ -417,7 +425,7 @@ class ArgFormatter(string.Formatter):
             py_format = self.convert_to_pythonic_format(match)
             formatted_str = self.format(py_format, args[i_arg] if args else None)  # This will call format_field()
             i_arg += 1 if match.group(0) != '%%' else 0
-            result_parts.append(fmt[i_str:match.start()] + formatted_str)
+            result_parts.append(fmt[i_str : match.start()] + formatted_str)
             i_str = match.end()
         # Add remaining part of the string after last match
         result_parts.append(fmt[i_str:])

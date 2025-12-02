@@ -1,11 +1,17 @@
 # See https://pre-commit.com for more information
 # See https://pre-commit.com/hooks.html for more hooks
 default_install_hook_types: [pre-commit, commit-msg]
-default_stages: ["pre-commit"]
-exclude: test/tests
+default_stages: [pre-commit]
+
+ci:
+  autofix_commit_msg: Apply automatic fixes from pre-commit hooks
+  autofix_prs: true
+  autoupdate_commit_msg: 'ci: Bump pre-commit hooks'
+  autoupdate_schedule: quarterly
+
 repos:
   - repo: https://github.com/pre-commit/pre-commit-hooks
-    rev: v3.4.0
+    rev: v6.0.0
     hooks:
       - id: end-of-file-fixer
         exclude: ^test/host_test/inputs
@@ -15,34 +21,28 @@ repos:
       - id: mixed-line-ending
         args: ['-f=lf']
         exclude: ^test/host_test/inputs
-      - id: double-quote-string-fixer
 
-  - repo: https://github.com/pycqa/flake8
-    rev: 4.0.1
+  - repo: https://github.com/astral-sh/ruff-pre-commit
+    rev: v0.12.11
     hooks:
-      - id: flake8
-        args: ['--config=.flake8']
-
-  - repo: https://github.com/pycqa/isort
-    rev: 5.11.5
-    hooks:
-      - id: isort
-        name: isort (python)
+      - id: ruff
+        args: [--fix, --exit-non-zero-on-fix]
+      - id: ruff-format
 
   - repo: https://github.com/pre-commit/mirrors-mypy
-    rev: 'v0.942'
+    rev: 'v1.17.1'
     hooks:
     -   id: mypy
 
   - repo: https://github.com/codespell-project/codespell
-    rev: v2.2.5
+    rev: v2.4.1
     hooks:
     - id: codespell
       additional_dependencies:
         - tomli
 
   - repo: https://github.com/espressif/conventional-precommit-linter
-    rev: v1.2.1
+    rev: v1.10.0
     hooks:
       - id: conventional-precommit-linter
         stages: [commit-msg]

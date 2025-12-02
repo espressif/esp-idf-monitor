@@ -3,10 +3,14 @@ import os
 import sys
 import time
 from datetime import datetime
-from typing import Any, Callable, List, Optional
+from typing import Any
+from typing import Callable
+from typing import List
+from typing import Optional
 
 import pytest
-from pytest_embedded.plugin import multi_dut_argument, multi_dut_fixture
+from pytest_embedded.plugin import multi_dut_argument
+from pytest_embedded.plugin import multi_dut_fixture
 
 DEFAULT_SDKCONFIG = 'default'
 
@@ -36,8 +40,7 @@ def pytest_collection_modifyitems(session: pytest.Session, config: pytest.Config
 
     # sort the test cases with (app folder, config)
     items[:] = sorted(
-        filtered_items,
-        key=lambda x: (os.path.dirname(x.path), get_param(x, 'config', DEFAULT_SDKCONFIG))
+        filtered_items, key=lambda x: (os.path.dirname(x.path), get_param(x, 'config', DEFAULT_SDKCONFIG))
     )
 
 
@@ -105,9 +108,7 @@ def build_dir(request: pytest.FixtureRequest, app_path: str, target: Optional[st
             logging.info(f'find valid binary path: {binary_path}')
             return check_dir
 
-        logging.warning(
-            'checking binary path: %s... missing... try another place', binary_path
-        )
+        logging.warning('checking binary path: %s... missing... try another place', binary_path)
 
     recommend_place = check_dirs[0]
     logging.error(

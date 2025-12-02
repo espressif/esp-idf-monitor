@@ -8,7 +8,10 @@ from typing import Optional  # noqa: F401
 IDF_PATH = os.getenv('IDF_PATH', '')
 ESP_ROM_ELF_DIR = os.getenv('ESP_ROM_ELF_DIR', '')
 # 'tools/idf_py_actions/roms.json' is used for compatibility with ESP-IDF before v5.5, when the file was moved
-ROMS_JSON = [os.path.join(IDF_PATH, 'components', 'esp_rom', 'roms.json'), os.path.join(IDF_PATH, 'tools', 'idf_py_actions', 'roms.json')]
+ROMS_JSON = [
+    os.path.join(IDF_PATH, 'components', 'esp_rom', 'roms.json'),
+    os.path.join(IDF_PATH, 'tools', 'idf_py_actions', 'roms.json'),
+]
 
 
 def get_rom_elf_path(target, chip_rev):  # type: (str, int) -> Optional[str]
@@ -18,7 +21,7 @@ def get_rom_elf_path(target, chip_rev):  # type: (str, int) -> Optional[str]
 
     for roms_json_path in ROMS_JSON:
         try:
-            with open(roms_json_path, 'r') as file:
+            with open(roms_json_path) as file:
                 target_roms = json.load(file).get(target, [])
             break
         except FileNotFoundError:

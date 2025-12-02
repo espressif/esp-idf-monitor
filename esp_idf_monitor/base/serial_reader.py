@@ -9,25 +9,32 @@ import time
 import serial
 from serial.tools import list_ports
 
-from .constants import (ASYNC_CLOSING_WAIT_NONE, CHECK_ALIVE_FLAG_TIMEOUT,
-                        FILTERED_PORTS, HIGH, LOW, RECONNECT_DELAY, TAG_SERIAL)
-from .output_helpers import error_print, note_print, yellow_print
+from .constants import ASYNC_CLOSING_WAIT_NONE
+from .constants import CHECK_ALIVE_FLAG_TIMEOUT
+from .constants import FILTERED_PORTS
+from .constants import HIGH
+from .constants import LOW
+from .constants import RECONNECT_DELAY
+from .constants import TAG_SERIAL
+from .output_helpers import error_print
+from .output_helpers import note_print
+from .output_helpers import yellow_print
 from .reset import Reset
 from .stoppable_thread import StoppableThread
 
 
 class Reader(StoppableThread):
-    """ Output Reader base class """
+    """Output Reader base class"""
 
 
 class SerialReader(Reader):
-    """ Read serial data from the serial port and push to the
+    """Read serial data from the serial port and push to the
     event queue, until stopped.
     """
 
     def __init__(self, serial_instance, event_queue, reset, open_port_attempts, target):
         #  type: (serial.Serial, queue.Queue, bool, int, str) -> None
-        super(SerialReader, self).__init__()
+        super().__init__()
         self.baud = serial_instance.baudrate
         self.serial = serial_instance
         self.event_queue = event_queue
@@ -51,17 +58,13 @@ class SerialReader(Reader):
                 self.open_serial(reset=self.reset)
                 # Successfully connected, so any further reconnections should occur without a reset.
                 self.reset = False
-            except (serial.SerialException, IOError, OSError) as e:
+            except (serial.SerialException, OSError) as e:
                 print(e)
                 if self.open_port_attempts == 1:
                     # If the connection to the port fails and --open-port-attempts was not specified,
                     # recommend other available ports and exit.
                     port_list = '\n'.join(
-                        [
-                            p.device
-                            for p in list_ports.comports()
-                            if not p.device.endswith(FILTERED_PORTS)
-                        ]
+                        [p.device for p in list_ports.comports() if not p.device.endswith(FILTERED_PORTS)]
                     )
                     note_print(f'Connection to {self.serial.portstr} failed. Available ports:\n{port_list}')
                     return
@@ -74,7 +77,7 @@ class SerialReader(Reader):
                         data = self.serial.read(self.serial.in_waiting or 1)
                     else:
                         raise serial.PortNotOpenError
-                except (serial.SerialException, IOError, OSError) as e:
+                except (serial.SerialException, OSError) as e:
                     data = b''
                     # self.serial.open() was successful before, therefore, this is an issue related to
                     # the disappearance of the device
@@ -88,7 +91,7 @@ class SerialReader(Reader):
                             self.open_serial(reset=self.reset)
                             self.reset = False
                             break  # device connected
-                        except (serial.SerialException, IOError, OSError):
+                        except (serial.SerialException, OSError):
                             yellow_print('.', newline='')
                             sys.stderr.flush()
 
@@ -131,12 +134,12 @@ class SerialReader(Reader):
             # get serial_struct
             try:
                 buf = fcntl.ioctl(self.serial.fd, termios.TIOCGSERIAL, buf)
-            except IOError:
+            except OSError:
                 # port has been disconnected
                 return
             serial_struct = list(struct.unpack(struct_format, buf))
 
-            # set `closing_wait` - amount of time, in hundredths of a second, that the kernel should wait before closing port
+            # set `closing_wait` - amount of time, in 100ths of second, that the kernel should wait before closing port
             # `closing_wait` is 13th (indexing from 0) variable in `serial_struct`, for reference see struct_format var
             if serial_struct[12] == ASYNC_CLOSING_WAIT_NONE:
                 return
@@ -163,7 +166,7 @@ class SerialReader(Reader):
 
 
 class LinuxReader(Reader):
-    """ Read data from the subprocess that runs runnable and push to the
+    """Read data from the subprocess that runs runnable and push to the
     event queue, until stopped.
     """
 

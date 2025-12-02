@@ -1,69 +1,71 @@
 [build-system]
-requires = ["setuptools>=64"]
-build-backend = "setuptools.build_meta"
+requires = ['setuptools>=64']
+build-backend = 'setuptools.build_meta'
 
 [project]
-name = "esp-idf-monitor"
-authors = [{name = "Espressif Systems"}]
-description = "Serial monitor for esp-idf"
-keywords = ["espressif", "embedded", "monitor", "serial"]
+name = 'esp-idf-monitor'
+authors = [{name = 'Espressif Systems'}]
+description = 'Serial monitor for esp-idf'
+keywords = ['espressif', 'embedded', 'monitor', 'serial']
+license = {text = 'Apache-2.0'}
 classifiers = [
-    "Development Status :: 5 - Production/Stable",
-    "Intended Audience :: Developers",
-    "Natural Language :: English",
-    "Environment :: Console",
-    "Topic :: Software Development :: Embedded Systems",
-    "License :: OSI Approved :: Apache Software License",
-    "Programming Language :: Python :: 3.7",
-    "Programming Language :: Python :: 3.8",
-    "Programming Language :: Python :: 3.9",
-    "Programming Language :: Python :: 3.10",
-    "Programming Language :: Python :: 3.11",
-    "Programming Language :: Python :: 3.12",
-    "Programming Language :: Python :: 3.13",
-    "Operating System :: POSIX",
-    "Operating System :: Microsoft :: Windows",
-    "Operating System :: MacOS :: MacOS X",
+    'Development Status :: 5 - Production/Stable',
+    'Intended Audience :: Developers',
+    'Natural Language :: English',
+    'Environment :: Console',
+    'Topic :: Software Development :: Embedded Systems',
+    'License :: OSI Approved :: Apache Software License',
+    'Programming Language :: Python :: 3.7',
+    'Programming Language :: Python :: 3.8',
+    'Programming Language :: Python :: 3.9',
+    'Programming Language :: Python :: 3.10',
+    'Programming Language :: Python :: 3.11',
+    'Programming Language :: Python :: 3.12',
+    'Programming Language :: Python :: 3.13',
+    'Programming Language :: Python :: 3.14',
+    'Operating System :: POSIX',
+    'Operating System :: Microsoft :: Windows',
+    'Operating System :: MacOS :: MacOS X',
 ]
-requires-python = ">=3.7"
+requires-python = '>=3.7'
 dynamic = ['version']
 dependencies = [
-    "pyserial>=3.3",
-    "esp-coredump~=1.2",
-    "esp-idf-panic-decoder~=1.4",
-    "pyelftools",
+    'pyserial>=3.3',
+    'esp-coredump~=1.2',
+    'esp-idf-panic-decoder~=1.4',
+    'pyelftools',
 ]
 
 [project.scripts]
-idf-monitor = "esp_idf_monitor.idf_monitor:main"
+idf-monitor = 'esp_idf_monitor.idf_monitor:main'
 
 [project.readme]
-file = "README.md"
-content-type = "text/markdown"
+file = 'README.md'
+content-type = 'text/markdown'
 
 [project.urls]
-Homepage = "https://github.com/espressif/esp-idf-monitor"
+Homepage = 'https://github.com/espressif/esp-idf-monitor'
 
 [project.optional-dependencies]
 dev = [
-    "pre-commit",
-    "czespressif; python_version >= '3.9'",
-    "coverage[toml]",
+    'pre-commit',
+    'czespressif; python_version >= "3.9"',
+    'coverage[toml]',
 ]
-ide = ["websocket-client"]
+ide = ['websocket-client']
 target_test = [
-    "SimpleWebSocketServer",
-    "pytest",
-    "pytest_embedded",
-    "pytest_embedded_idf",
-    "pytest_embedded_serial_esp",
-    "idf_build_apps",
-    "idf-component-manager",
+    'SimpleWebSocketServer',
+    'pytest',
+    'pytest_embedded',
+    'pytest_embedded_idf',
+    'pytest_embedded_serial_esp',
+    'idf_build_apps',
+    'idf-component-manager',
 ]
 host_test = [
-    "pytest",
-    "pytest-rerunfailures",
-    "esptool"
+    'pytest',
+    'pytest-rerunfailures',
+    'esptool'
 ]
 
 [tool.setuptools]
@@ -73,32 +75,32 @@ include-package-data = false
 find = {namespaces = false}
 
 [tool.setuptools.dynamic]
-version = {attr = "esp_idf_monitor.__version__"}
+version = {attr = 'esp_idf_monitor.__version__'}
 
 [tool.commitizen]
-name = "czespressif"
-version = "1.8.0"
+name = 'czespressif'
+version = '1.8.0'
 update_changelog_on_bump = true
-tag_format = "v$version"
+tag_format = 'v$version'
 changelog_merge_prerelease = true
 annotated_tag = true
-changelog_start_rev = "v1.2.0"
-bump_message = "change: Update version to $new_version"
+changelog_start_rev = 'v1.2.0'
+bump_message = 'change: Update version to $new_version'
 version_files = [
-    "esp_idf_monitor/__init__.py:__version__"
+    'esp_idf_monitor/__init__.py:__version__'
 ]
 
 [tool.mypy]
-    disallow_incomplete_defs = false # Disallows defining functions with incomplete type annotations
-    disallow_untyped_defs    = false # Disallows defining functions without type annotations or with incomplete type annotations
-    ignore_missing_imports   = true  # Suppress error messages about imports that cannot be resolved
-    python_version           = "3.9" # Specifies the Python version used to parse and check the target program
-    warn_no_return           = true  # Shows errors for missing return statements on some execution paths
-    warn_return_any          = true  # Shows a warning when returning a value with type Any from a function declared with a non- Any return type
+disallow_incomplete_defs = false # Disallows defining functions with incomplete type annotations
+disallow_untyped_defs    = false # Disallows defining functions without type annotations or with incomplete type annotations
+ignore_missing_imports   = true  # Suppress error messages about imports that cannot be resolved
+python_version           = '3.7' # Specifies the Python version used to parse and check the target program
+warn_no_return           = true  # Shows errors for missing return statements on some execution paths
+warn_return_any          = true  # Shows a warning when returning a value with type Any from a function declared with a non- Any return type
 
 [tool.coverage.run]
 parallel = true
-source = ["../esp_idf_monitor/", "../../esp_idf_monitor/", "esp_idf_monitor/"]
+source = ['../esp_idf_monitor/', '../../esp_idf_monitor/', 'esp_idf_monitor/']
 
 [tool.coverage.report]
 # Ignore missing source files to handle cross-platform path issues
@@ -106,8 +108,22 @@ skip_empty = true
 
 [tool.coverage.paths]
 # following paths will be considered as equivalent to maintain multiplatform compatibility
-source = ["./esp_idf_monitor/", "*/esp_idf_monitor/"]
+source = ['./esp_idf_monitor/', '*/esp_idf_monitor/']
 
 [tool.codespell]
 write-changes = true
 skip = 'test/host_test/inputs/*'
+
+[tool.ruff]
+line-length = 120
+
+[tool.ruff.lint]
+select = ['A', 'E', 'F', 'W', 'I', 'UP']
+
+[tool.ruff.lint.isort]
+force-single-line = true
+
+[tool.ruff.format]
+quote-style = 'single'
+indent-style = 'space'
+docstring-code-format = true
