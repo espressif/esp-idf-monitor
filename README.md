@@ -24,8 +24,11 @@ Other advanced topics like configuration file will be described in the following
 
 You can install the project with your favorite package manager, but for standalone installations it is recommended to use [uv](https://docs.astral.sh/uv/) or [pipx](https://pipx.pypa.io/stable/). Using one of the following commands:
 
+> [!NOTE]
+> It is always recommended to install packages in a virtual environment. Both tools recommended below will help you create a virtual environment.
+
 ```sh
-uv install esp-idf-monitor
+uv tool install esp-idf-monitor
 ```
 
 or
@@ -34,7 +37,7 @@ or
 pipx install esp-idf-monitor
 ```
 
-These will install an `idf-monitor` executable for the current user without requiring administrator privileges.
+Both methods will install an `idf-monitor` executable for the current user without requiring administrator privileges.
 
 ## Usage
 
