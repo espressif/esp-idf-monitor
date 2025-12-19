@@ -667,3 +667,145 @@ class TestCStyleConversion(TestBaseClass):
         assert converted_format == pythonic_fmt, f"Expected Pythonic format '{pythonic_fmt}', got '{converted_format}'"
         formatted_output = formatter.c_format(c_fmt, [arg])
         assert formatted_output == output, f"Expected '{output}', got '{formatted_output}'"
+
+
+class TestEmbeddedMonitorCommands:
+    """Tests for SecureMonitorCommandExecutor handling embedded monitor commands."""
+
+    class DummyLogger:
+        def __init__(self) -> None:
+            self.outputs: List[bytes] = []
+
+        def print(self, data: bytes) -> None:
+            self.outputs.append(data)
+
+    @pytest.mark.parametrize(
+        'input_line, expect_called, expected_argv',
+        [
+            # Unknown marker type after IDF_MONITOR_EXECUTE_: should be ignored
+            (
+                'I (20) test: IDF_MONITOR_EXECUTE_UNKNOWN EFSR:esp32c3:100:AAA\n',
+                False,
+                None,
+            ),
+            # Marker without any arguments: should be ignored
+            (
+                'I (20) test: IDF_MONITOR_EXECUTE_ESPEFUSE_SUMMARY\n',
+                False,
+                None,
+            ),
+            # Valid ESPEFUSE_SUMMARY with token
+            (
+                'I (311) example: IDF_MONITOR_EXECUTE_ESPEFUSE_SUMMARY EFSR:esp32c3:100:AAA\n',
+                True,
+                ['espefuse', '--token', 'EFSR:esp32c3:100:AAA', 'summary', '--active'],
+            ),
+            # Valid ESPEFUSE_DUMP with token
+            (
+                'I (331) example: IDF_MONITOR_EXECUTE_ESPEFUSE_DUMP EFSR:esp32c3:100:AAA\n',
+                True,
+                ['espefuse', '--token', 'EFSR:esp32c3:100:AAA', 'dump'],
+            ),
+        ],
+    )
+    def test_monitor_embedded_command_execution(
+        self,
+        input_line: str,
+        expect_called: bool,
+        expected_argv: Optional[List[str]],
+        monkeypatch,
+    ):
+        """
+        Verify that SecureMonitorCommandExecutor:
+        """
+        from esp_idf_monitor.base.monitor_secure_exec import SecureMonitorCommandExecutor
+
+        calls = []
+
+        def fake_check_output(argv, stderr=None, env=None, shell=None):
+            calls.append(
+                {
+                    'argv': argv,
+                    'stderr': stderr,
+                    'env': env,
+                    'shell': shell,
+                }
+            )
+            return b'OK\n'
+
+        # Patch subprocess.check_output used inside monitor_secure_exec
+        monkeypatch.setattr(
+            'esp_idf_monitor.base.monitor_secure_exec.subprocess.check_output',
+            fake_check_output,
+        )
+
+        logger = self.DummyLogger()
+        executor = SecureMonitorCommandExecutor(logger)
+
+        # Run executor for this test case (single full line, with '\n')
+        executor.execute_from_log_line(input_line.encode('ascii'))
+
+        if not expect_called:
+            assert calls == []
+            assert logger.outputs == []
+            return
+
+        # Exactly one subprocess call expected
+        assert len(calls) == 1
+        call = calls[0]
+        argv = call['argv']
+
+        # Full argv must match the expected expansion of the template
+        assert argv == expected_argv
+
+        # Explicitly verify that shell=False was used
+        assert call['shell'] is False
+
+        # Logger should receive the output from the subprocess
+        assert logger.outputs == [b'OK\n']
+
+    def test_monitor_embedded_command_streaming_chunks(self, monkeypatch):
+        """
+        Verify that execute_from_log_line handles partial lines and only
+        executes once a complete line (with '\n') is received.
+        """
+        from esp_idf_monitor.base.monitor_secure_exec import SecureMonitorCommandExecutor
+
+        calls = []
+
+        def fake_check_output(argv, stderr=None, env=None, shell=None):
+            calls.append(
+                {
+                    'argv': argv,
+                    'stderr': stderr,
+                    'env': env,
+                    'shell': shell,
+                }
+            )
+            return b'OK\n'
+
+        monkeypatch.setattr(
+            'esp_idf_monitor.base.monitor_secure_exec.subprocess.check_output',
+            fake_check_output,
+        )
+
+        logger = self.DummyLogger()
+        executor = SecureMonitorCommandExecutor(logger)
+
+        # First chunk: no newline yet, should not trigger execution
+        chunk1 = b'I (311) example: IDF_MONITOR_EXECUTE_ESPEFUSE_SUMMARY EFSR:esp32c3:100:AAA'
+        executor.execute_from_log_line(chunk1)
+        assert calls == []
+        assert logger.outputs == []
+
+        # Second chunk: completes the line with '\n'
+        chunk2 = b'BBB\n'
+        executor.execute_from_log_line(chunk2)
+
+        # Now we expect exactly one call, with the combined token "AAABBB"
+        assert len(calls) == 1
+        call = calls[0]
+        argv = call['argv']
+        assert argv == ['espefuse', '--token', 'EFSR:esp32c3:100:AAABBB', 'summary', '--active']
+        assert call['shell'] is False
+        assert logger.outputs == [b'OK\n']

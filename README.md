@@ -19,6 +19,7 @@ Other advanced topics like configuration file will be described in the following
     - [Custom Reset Sequence](#custom-reset-sequence)
       - [Share Configuration Across Tools](#share-configuration-across-tools)
   - [Syntax](#syntax)
+- [Embedded Command Execution](#embedded-command-execution)
 
 ## Installation
 
@@ -168,6 +169,54 @@ chip_reset_bootloader_key = P
 exit_menu_key = X
 skip_menu_key = False
 ```
+
+## Embedded Command Execution
+
+`esp-idf-monitor` includes an advanced feature that automatically executes host-side tools when the target device outputs specific markers in its logs. This is particularly useful for workflows where device firmware needs to perform operations that are better handled on the host computer—such as decoding or analyzing chip data (for example, reading and interpreting eFuse dump).
+
+### How It Works
+
+When the monitor detects one of the predefined markers in the device output, it automatically executes the corresponding command template. The command substitutes data from the device output (such as eFuse tokens) into the template, allowing seamless data analysis without manual intervention.
+
+### Supported Markers
+
+The following markers are currently supported:
+
+| Marker                                 | Command Template                           | Use Case                           |
+|----------------------------------------|--------------------------------------------|------------------------------------|
+| `IDF_MONITOR_EXECUTE_ESPEFUSE_SUMMARY` | `espefuse --token {ARGS} summary --active` | Display active eFuse summary       |
+| `IDF_MONITOR_EXECUTE_ESPEFUSE_DUMP`    | `espefuse --token {ARGS} dump`             | Display eFuse dump                 |
+
+For both commands, `{ARGS}` must include:
+- A token eFuse dump (format: `EFSR:chiptype:size:hexdata...`)
+- Optionally, additional flags such as `--extend-efuse-table main/esp_efuse_custom_table.csv` to extend eFuse field definitions
+
+### Usage Example
+
+When your firmware outputs a line containing `IDF_MONITOR_EXECUTE_ESPEFUSE_DUMP`:
+
+```text
+I (481) example: IDF_MONITOR_EXECUTE_ESPEFUSE_DUMP EFSR:esp32c3:100:AAAAAAAAAAAAAAAAAAAAAAAAAIAAAAAA:zIH3-VVgAAAAAAAAAAAAS8kmEVKwQgYB:ZSd8yloMSAJssOWmfZQw8lFbphuTZH574QcV3ggAAAA:AAAAAAAAAAEayAcAAAAAAAAAAAAAAAAAAAAAAAAAAAA:::::::::ydrNkQ
+--- Executing monitor command: espefuse --token EFSR:esp32c3:100:... dump
+espefuse v5.1.0
+=== Run "dump" command ===
+BLOCK0          (                ) [0 ] dump: 00000000 00000000 00000000 00000000 80000000 00000000
+MAC_SPI_8M_0    (BLOCK1          ) [1 ] dump: f9f781cc 00006055 00000000 4b000000 521126c9 010642b0
+BLOCK_SYS_DATA  (BLOCK2          ) [2 ] dump: ca7c2765 02480c5a a6e5b06c f230947d 1ba65b51 7b7e6493 de1507e1 00000008
+...
+I (331) example: read efuse fields
+```
+
+### Security and Limitations
+
+For your security and to ensure predictable behavior, IDF Monitor:
+
+- Does not execute arbitrary commands printed by the device
+- Supports only a small, predefined set of markers mapped to fixed command templates
+- Accepts only `<ARGS>` from the device—the eFuse token and optional flags—which are substituted into the template
+- Executes all commands with `shell=False`, preventing shell metacharacters (`&&`, `;`, `|`, `>`) from being interpreted
+
+This intentional limitation ensures that only specific, safe espefuse operations are available. Any future extensions would require careful review for security implications.
 
 ## Contributing
 
