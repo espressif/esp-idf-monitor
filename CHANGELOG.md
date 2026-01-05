@@ -21,6 +21,19 @@
 <hr>
 
 
+## v1.9.0 (2026-01-05)
+
+### ✨ New Features
+
+- **monitor_secure_exec**: Support executing CLI commands from monitor logs *(Konstantin Kondrashov - ebf5699)*
+- **port_detection**: Filter out debug console serial port on MacOS *(Jaroslav Burian - 931856d)*
+- Add 'idf-monitor' as a script for easier standalone usage *(Peter Dragun - 0b41ece)*
+
+### 📖 Documentation
+
+- Add instructions for standalone usage *(Peter Dragun - fb1fcb9)*
+
+
 ## v1.8.0 (2025-09-12)
 
 ### ✨ New Features
