@@ -145,4 +145,11 @@ def get_parser():  # type: () -> argparse.ArgumentParser
         type=int,
     )
 
+    parser.add_argument(
+        '--save-log',
+        '-s',
+        help='Save log of monitor',
+        action='store_true',
+    )
+
     return parser

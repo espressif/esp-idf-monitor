@@ -514,11 +514,15 @@ def main() -> None:
             rom_elf_file,
         )
 
+        if args.save_log:
+            monitor.logger.start_logging()
+
         note_print(
             'Quit: {q} | Menu: {m} | Help: {m} followed by {h}'.format(
                 q=key_description(EXIT_KEY), m=key_description(MENU_KEY), h=key_description(CTRL_H)
             )
         )
+
         if args.print_filter != DEFAULT_PRINT_FILTER:
             msg = ''
             # Check if environment variable was used to set print_filter
