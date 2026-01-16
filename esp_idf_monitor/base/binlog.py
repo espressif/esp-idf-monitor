@@ -423,8 +423,12 @@ class ArgFormatter(string.Formatter):
             if not match:
                 break
             py_format = self.convert_to_pythonic_format(match)
-            formatted_str = self.format(py_format, args[i_arg] if args else None)  # This will call format_field()
-            i_arg += 1 if match.group(0) != '%%' else 0
+            if match.group(0) == '%%':
+                # Literal percent sign, no need to format
+                formatted_str = '%'
+            else:
+                formatted_str = self.format(py_format, args[i_arg] if args else None)  # This will call format_field()
+                i_arg += 1
             result_parts.append(fmt[i_str : match.start()] + formatted_str)
             i_str = match.end()
         # Add remaining part of the string after last match

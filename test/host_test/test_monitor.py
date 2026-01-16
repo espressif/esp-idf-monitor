@@ -654,6 +654,7 @@ class TestCStyleConversion(TestBaseClass):
             # Literal percent sign
             ('|%%|', '', '%', '|%|'),
             ('|%%| |%s|', 'Hello_world', '%', '|%| |Hello_world|'),
+            ('|%d%%|', 12, '{:d}', '|12%|'),
             # } character in c-style format does not break pythonic format conversion
             ('} |%s|', 'Hello_world', '{:>s}', '} |Hello_world|'),
         ],
