@@ -12,6 +12,7 @@ from serial.tools.miniterm import Console  # noqa: F401
 from .console_parser import ConsoleParser  # noqa: F401
 from .constants import CMD_STOP
 from .constants import TAG_CMD
+from .output_helpers import note_print
 from .stoppable_thread import StoppableThread
 
 
@@ -28,6 +29,7 @@ class ConsoleReader(StoppableThread):
         self.cmd_queue = cmd_queue
         self.parser = parser
         self.test_mode = test_mode
+        self.cmd_stop_count = 0
         if sys.platform == 'win32':
             # This is a workaround for multi-byte characters causing the console to be killed by OS.
             # Miniterm is setting the code page to UTF-8 which in combination with multibyte Unicode characters
@@ -82,6 +84,22 @@ class ConsoleReader(StoppableThread):
                         # stop command should be executed last
                         if tag == TAG_CMD and cmd != CMD_STOP:
                             self.cmd_queue.put(ret)
+                        elif cmd == CMD_STOP:
+                            self.cmd_stop_count += 1
+                            if self.cmd_stop_count >= 2:
+                                note_print('Multiple stop commands received, forcing quit monitor')
+                                # event_queue normally contains data from the chip. Moving the CMD_STOP to the cmd_queue
+                                # should make the monitor quit sooner, as this takes priority and we assume the queue is
+                                # usually empty. This is not a proper force quit, as there might be some data in the
+                                # cmd_queue as well, only an escalation of the stop command.
+                                self.cmd_queue.put(ret)
+                            else:
+                                if self.event_queue.qsize() > 100:
+                                    note_print(
+                                        'IDF Monitor will decode all received data and close. '
+                                        'If you want to stop the monitor immediately, press exit key again.'
+                                    )
+                                self.event_queue.put(ret)
                         else:
                             self.event_queue.put(ret)
 
