@@ -45,23 +45,30 @@ class Reset:
         self._load_config()
 
     def _load_config(self) -> None:
-        """Load configuration for custom reset sequence
-        Look for custom_reset_sequence in esp-idf-monitor config, if not found fallback to esptool config
+        """Load configuration for custom reset sequences.
+        Look for custom_reset_sequence and custom_hard_reset_sequence
+        in esp-idf-monitor config, if not found fallback to esptool config.
         """
         custom_cfg = Config()
         custom_config, self.config_path = custom_cfg.load_configuration()
         # try to get the custom reset sequence from esp-idf-monitor
-        self.esptool_config = False
+        self.bootloader_reset_from_esptool = False
+        self.hard_reset_from_esptool = False
         self.custom_seq = custom_config['esp-idf-monitor'].get('custom_reset_sequence')
+        self.custom_hard_seq = custom_config['esp-idf-monitor'].get('custom_hard_reset_sequence')
         if self.config_path is None:
             # config for esp-idf-monitor was not found, looking for esptool configuration
             # this is required in case the config file doesn't contain esp-idf-monitor section at all
             custom_cfg = Config(config_name='esptool')
             custom_config, self.config_path = custom_cfg.load_configuration()
         if self.custom_seq is None and 'esptool' in custom_config.keys():
-            # get reset sequence from esptool section
+            # get bootloader reset sequence from esptool section
             self.custom_seq = custom_config['esptool'].get('custom_reset_sequence')
-            self.esptool_config = True
+            self.bootloader_reset_from_esptool = self.custom_seq is not None
+        if self.custom_hard_seq is None and 'esptool' in custom_config.keys():
+            # get hard reset sequence from esptool section
+            self.custom_hard_seq = custom_config['esptool'].get('custom_hard_reset_sequence')
+            self.hard_reset_from_esptool = self.custom_hard_seq is not None
 
     def _get_port_pid(self) -> Optional[int]:
         """Get port PID to differentiate between JTAG and UART reset sequences"""
@@ -98,28 +105,33 @@ class Reset:
             status &= ~TIOCM_RTS
         fcntl.ioctl(self.serial_instance.fileno(), TIOCMSET, struct.pack('I', status))
 
-    def _parse_string_to_seq(self, seq_str: str) -> str:
+    def _parse_string_to_seq(self, seq_str: str, option_name: str = 'custom_reset_sequence') -> str:
         """Parse custom reset sequence from a config"""
         try:
             cmds = seq_str.split('|')
             fn_calls_list = [self.format_dict[cmd[0]].format(cmd[1:]) for cmd in cmds]
         except Exception as e:
-            error_print(f'Invalid "custom_reset_sequence" option format: {e}')
+            error_print(f'Invalid "{option_name}" option format: {e}')
             return ''
         return '\n'.join(fn_calls_list)
 
     def hard(self) -> None:
         """Hard reset chip"""
-        self._setRTS(LOW)  # EN=LOW, chip in reset
-        time.sleep(self.chip_config['reset'])
-        self._setRTS(HIGH)  # EN=HIGH, chip out of reset
+        if self.custom_hard_seq:
+            source = 'esptool ' if self.hard_reset_from_esptool else ''
+            note_print(f'Using custom hard reset sequence from {source}config file: {self.config_path}')
+            exec(self._parse_string_to_seq(self.custom_hard_seq, 'custom_hard_reset_sequence'))
+        else:
+            self._setRTS(LOW)  # EN=LOW, chip in reset
+            time.sleep(self.chip_config['reset'])
+            self._setRTS(HIGH)  # EN=HIGH, chip out of reset
 
     def to_bootloader(self) -> None:
         """Reset chip into bootloader"""
         if self.custom_seq:
             # use custom reset sequence set in config file
-            source = 'from esptool ' if self.esptool_config else ''
-            note_print(f'Using custom reset sequence {source}config file: {self.config_path}')
+            source = 'esptool ' if self.bootloader_reset_from_esptool else ''
+            note_print(f'Using custom reset sequence from {source}config file: {self.config_path}')
             exec(self._parse_string_to_seq(self.custom_seq))
         elif self.port_pid == USB_JTAG_SERIAL_PID:
             # use reset sequence for JTAG

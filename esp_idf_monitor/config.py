@@ -22,6 +22,7 @@ VALID_OPTIONS = [
     'skip_menu_key',
     'reconnect_delay',
     'custom_reset_sequence',  # from esptool config
+    'custom_hard_reset_sequence',
 ]
 
 

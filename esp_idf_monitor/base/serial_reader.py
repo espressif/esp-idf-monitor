@@ -108,9 +108,12 @@ class SerialReader(Reader):
 
         self.serial.open()
 
-        # set DTR/RTS into expected HIGH state, but set the RTS first to avoid reset
-        self.reset_strategy._setRTS(HIGH)
-        self.reset_strategy._setDTR(HIGH)
+        # When using custom hard reset, skip before reset so the sequence can control lines;
+        # when --no-reset is used, use the default behavior even if custom hard reset is set
+        if not self.reset_strategy.custom_hard_seq or not reset:
+            # set DTR/RTS into expected HIGH state, but set the RTS first to avoid reset
+            self.reset_strategy._setRTS(HIGH)
+            self.reset_strategy._setDTR(HIGH)
         if reset:
             self.reset_strategy.hard()
 

@@ -644,7 +644,7 @@ class TestConfig(TestBaseClass):
 
         with open(err) as f_err:
             stderr = f_err.read()
-        msg = f'--- Using custom reset sequence config file: {os.path.join(os.getcwd(), "config.cfg")}'
+        msg = f'--- Using custom reset sequence from config file: {os.path.join(os.getcwd(), "config.cfg")}'
         assert msg in stderr
         # remove everything before message about using custom config to remove starting reset sequence
         log_seq = stderr.split(msg)[1]
@@ -673,8 +673,33 @@ class TestConfig(TestBaseClass):
         with open(err) as f_err:
             stderr = f_err.read()
         # check for error message that reset sequence was invalid
-        assert f'--- Using custom reset sequence config file: {os.path.join(os.getcwd(), "config.cfg")}' in stderr
+        assert f'--- Using custom reset sequence from config file: {os.path.join(os.getcwd(), "config.cfg")}' in stderr
         assert '--- Error: Invalid "custom_reset_sequence" option format: \'F\'' in stderr
+
+    def test_custom_hard_reset_sequence(self):
+        """Use custom hard reset sequence"""
+        # create custom config with custom hard reset sequence
+        self.create_config({'custom_hard_reset_sequence': 'R1|W0.1|R0'})
+        # run monitor
+        _, err = self.run_monitor_async(args=['--no-reset'])
+        # hard reset chip
+        self.send_control('TR')
+        # wait for command to apply
+        time.sleep(0.5)
+        assert self.close_monitor_async() == 0
+        with open(err) as f_err:
+            stderr = f_err.read()
+        msg = f'--- Using custom hard reset sequence from config file: {os.path.join(os.getcwd(), "config.cfg")}'
+        assert msg in stderr
+        # remove everything before message about using custom config to remove starting reset sequence
+        log_seq = stderr.split(msg)[1]
+        # check in pyserial log that custom hard reset sequence was used (Note: we cannot test the wait part)
+        my_seq = [
+            'INFO:pySerial.socket:ignored _update_rts_state(1)',  # R1
+            'INFO:pySerial.socket:ignored _update_dtr_state(False)',  # expected workaround for windows RTS setting
+            'INFO:pySerial.socket:ignored _update_rts_state(0)',  # R0
+        ]
+        assert '\n'.join(my_seq) in log_seq
 
 
 class TestCStyleConversion(TestBaseClass):
