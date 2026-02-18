@@ -47,7 +47,7 @@ def get_chip_config(chip, revision=0):
     # If some fields are missing, they will be taken from next lower revision or from the `default`.
     default = dict(conf['default'][0])
     rev_number = int(revision)
-    if chip not in conf.keys():
+    if chip not in conf:
         return default
     chip_revisions = sorted(list(conf[chip].keys()), key=int)
     for rev in chip_revisions:

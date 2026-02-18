@@ -404,9 +404,7 @@ class ArgFormatter(string.Formatter):
             return 'x' if specifier == 'x' else 'X'
         elif specifier in 'fFeEgGaA':
             return specifier
-        elif specifier == 'c':  # Characters treated as string
-            return 's'
-        elif specifier in 'sS':
+        elif specifier == 'c' or specifier in 'sS':  # Characters treated as string
             return 's'
         elif specifier == 'p':
             return '#x'
