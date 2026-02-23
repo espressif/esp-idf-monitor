@@ -129,63 +129,70 @@ class Message:
             length = match.group('length') or ''
             specifier = match.group('specifier')
 
-            # **Handling String (%s, %S)**
-            if specifier in 'sS':
-                if self.buffer_hex_log or self.buffer_char_log or self.buffer_hexdump_log:
-                    buffer_len = (
-                        args[-1] if isinstance(args[-1], int) else None
-                    )  # Previous argument is the buffer length
-                    data, data_len = self.retrieve_data(raw_args[i_arg:], buffer_len)
-                    args.append(data)
+            try:
+                # **Handling String (%s, %S)**
+                if specifier in 'sS':
+                    if self.buffer_hex_log or self.buffer_char_log or self.buffer_hexdump_log:
+                        buffer_len = (
+                            args[-1] if isinstance(args[-1], int) else None
+                        )  # Previous argument is the buffer length
+                        data, data_len = self.retrieve_data(raw_args[i_arg:], buffer_len)
+                        args.append(data)
+                    else:
+                        text, data_len = self.retrieve_string(raw_args[i_arg:])
+                        args.append(text)
+                    i_arg += data_len
+
+                # **Handling Floating Point (%f, %e, %g, etc.)**
+                elif specifier in 'fFeEgGaA':
+                    arg_format = '>d'
+                    args.append(struct.unpack_from(arg_format, raw_args, i_arg)[0])
+                    i_arg += struct.calcsize(arg_format)
+
+                # **Handling Length-Prefixed Integers**
+                elif specifier in 'diouxX':
+                    # **ESP32 sends only 32-bit or 64-bit values**
+                    if length == 'll':  # 64-bit integers
+                        fmt = 'q'
+                    else:  # 32-bit integers
+                        if length == 'h':  # short
+                            fmt = 'h'
+                            i_arg += 2
+                        elif length == 'hh':  # char
+                            fmt = 'b'
+                            i_arg += 3
+                        else:  # int
+                            fmt = 'i'
+                    fmt = fmt.lower() if specifier in 'di' else fmt.upper()  # Signed or unsigned
+                    value = struct.unpack_from(f'>{fmt}', raw_args, i_arg)[0]
+                    i_arg += struct.calcsize(fmt)
+                    args.append(value)
+
+                # **Handling Pointer (%p)**
+                elif specifier == 'p':
+                    arg_format = '>I'
+                    args.append(struct.unpack_from(arg_format, raw_args, i_arg)[0])
+                    i_arg += struct.calcsize(arg_format)
+
+                # **Handling Characters (%c)**
+                elif specifier == 'c':
+                    i_arg += 3
+                    arg_format = '>c'
+                    args.append(struct.unpack_from(arg_format, raw_args, i_arg)[0].decode(errors='replace'))
+                    i_arg += struct.calcsize(arg_format)
+
+                # **Default: Treat as integer (%d, %i)**
                 else:
-                    text, data_len = self.retrieve_string(raw_args[i_arg:])
-                    args.append(text)
-                i_arg += data_len
+                    arg_format = '>i'
+                    val = struct.unpack_from(arg_format, raw_args, i_arg)[0]
+                    args.append(val)
+                    i_arg += struct.calcsize(arg_format)
 
-            # **Handling Floating Point (%f, %e, %g, etc.)**
-            elif specifier in 'fFeEgGaA':
-                arg_format = '>d'
-                args.append(struct.unpack_from(arg_format, raw_args, i_arg)[0])
-                i_arg += struct.calcsize(arg_format)
+            except struct.error:
+                # Argument data is truncated (e.g. frame cut off mid-transmission).
+                # Return whatever args we managed to unpack rather than crashing.
+                break
 
-            # **Handling Length-Prefixed Integers**
-            elif specifier in 'diouxX':
-                # **ESP32 sends only 32-bit or 64-bit values**
-                if length == 'll':  # 64-bit integers
-                    fmt = 'q'
-                else:  # 32-bit integers
-                    if length == 'h':  # short
-                        fmt = 'h'
-                        i_arg += 2
-                    elif length == 'hh':  # char
-                        fmt = 'b'
-                        i_arg += 3
-                    else:  # int
-                        fmt = 'i'
-                fmt = fmt.lower() if specifier in 'di' else fmt.upper()  # Signed or unsigned
-                value = struct.unpack_from(f'>{fmt}', raw_args, i_arg)[0]
-                i_arg += struct.calcsize(fmt)
-                args.append(value)
-
-            # **Handling Pointer (%p)**
-            elif specifier == 'p':
-                arg_format = '>I'
-                args.append(struct.unpack_from(arg_format, raw_args, i_arg)[0])
-                i_arg += struct.calcsize(arg_format)
-
-            # **Handling Characters (%c)**
-            elif specifier == 'c':
-                i_arg += 3
-                arg_format = '>c'
-                args.append(struct.unpack_from(arg_format, raw_args, i_arg)[0].decode(errors='replace'))
-                i_arg += struct.calcsize(arg_format)
-
-            # **Default: Treat as integer (%d, %i)**
-            else:
-                arg_format = '>i'
-                val = struct.unpack_from(arg_format, raw_args, i_arg)[0]
-                args.append(val)
-                i_arg += struct.calcsize(arg_format)
         return args
 
 
@@ -224,10 +231,18 @@ class BinaryLog:
             crc &= 0xFF  # Ensure it's within 8 bits
         return crc
 
+    @staticmethod
+    def _plausible_frame_start(control: 'Control') -> bool:
+        """Return True if the control word looks like it could be the start of a real
+        binary log frame rather than noise.  Valid ESP log levels are 1-5 and the only
+        defined version is 0; noise bytes (e.g. 0xFF 0xFF) produce level=7 / version=3
+        which we reject so that scan-ahead continues instead of prematurely breaking."""
+        return 1 <= control.level <= 5 and control.version == 0 and control.pkg_len >= 15
+
     def find_frames(self, data: bytes) -> Tuple[List[bytes], bytes]:
         frames: List[bytes] = []
         i = 0
-        idx_of_last_found_pkg = 0
+        idx_partial_frame = None  # start index of a plausible but incomplete frame
 
         while i < len(data):
             if len(data[i:]) < 15:  # Minimal frame len
@@ -237,23 +252,46 @@ class BinaryLog:
                 try:
                     control = Control(data[start_idx + 1 :])
                     if control.pkg_len > len(data[i:]):
-                        break
+                        # Frame extends beyond available data. Only treat it as a
+                        # genuine partial frame (and stop scanning) if the control
+                        # word looks plausible. Noise bytes that happen to start
+                        # with 0x01/0x02 typically have nonsensical level/version
+                        # values, so those are skipped and scanning continues.
+                        if self._plausible_frame_start(control):
+                            idx_partial_frame = start_idx
+                            break
+                        i += 1
+                        continue
                     frame = data[start_idx : start_idx + control.pkg_len]
                     if control.pkg_len != 0 and self.crc8(frame) == 0:
                         frames.append(frame)
-                        idx_of_last_found_pkg = start_idx + control.pkg_len
                         i += control.pkg_len - 1
                     else:
-                        raise ValueError('Invalid binary log; invalid CRC')
+                        # CRC mismatch – skip this byte and try to re-sync
+                        i += 1
+                        continue
                 except (struct.error, IndexError):
-                    # Invalid control structure
-                    raise ValueError('Invalid binary log; invalid control structure')
-            else:
-                raise ValueError('Invalid binary log; invalid start of frame')
+                    # Malformed control structure – skip this byte and try to re-sync
+                    i += 1
+                    continue
+            # Not a recognised start byte – advance and keep scanning
 
             i += 1
-        # Return recognized frames and any remaining unprocessed data
-        return frames, data[idx_of_last_found_pkg:]
+
+        # Decide what to carry forward for the next call:
+        # 1. Stopped early on a plausible partial frame → stash from that point so
+        #    the next read can complete it.
+        # 2. Broke at the < 15-byte minimum-length check and the remaining bytes
+        #    start with a binary frame marker → stash them for the same reason.
+        #    If they don't start with a marker they are noise/text and must not be
+        #    carried forward as binary data.
+        # 3. Everything else → return b'' so stale data doesn't keep the caller
+        #    locked in binary mode across a device reset.
+        if idx_partial_frame is not None:
+            return frames, data[idx_partial_frame:]
+        if i < len(data) and self.detected(data[i]):
+            return frames, data[i:]
+        return frames, b''
 
     def convert_to_text(self, data: bytes) -> Tuple[List[bytes], bytes]:
         messages: List[bytes] = []
@@ -268,9 +306,13 @@ class BinaryLog:
         return messages, incomplete_fragment
 
     def format_message(self, message: Message) -> bytes:
-        text_msg = ArgFormatter().c_format(message.format, message.args)
+        try:
+            text_msg = ArgFormatter().c_format(message.format, message.args)
+        except (IndexError, KeyError):
+            # Fewer args were decoded than the format string expects (truncated frame).
+            text_msg = message.format
         level_name = {1: 'E', 2: 'W', 3: 'I', 4: 'D', 5: 'V'}[message.control.level]
-        return f'{level_name} ({message.timestamp}) {message.tag}: {text_msg}\n'.encode('ascii')
+        return f'{level_name} ({message.timestamp}) {message.tag}: {text_msg}\n'.encode()
 
     def format_buffer_message(self, message) -> List[bytes]:
         text_msg: List[bytes] = []
