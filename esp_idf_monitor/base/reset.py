@@ -53,6 +53,7 @@ class Reset:
         # try to get the custom reset sequence from esp-idf-monitor
         self.esptool_config = False
         self.custom_seq = custom_config['esp-idf-monitor'].get('custom_reset_sequence')
+        self.custom_hard_seq = custom_config['esp-idf-monitor'].get('custom_hard_reset_sequence')
         if self.config_path is None:
             # config for esp-idf-monitor was not found, looking for esptool configuration
             # this is required in case the config file doesn't contain esp-idf-monitor section at all
@@ -110,9 +111,12 @@ class Reset:
 
     def hard(self) -> None:
         """Hard reset chip"""
-        self._setRTS(LOW)  # EN=LOW, chip in reset
-        time.sleep(self.chip_config['reset'])
-        self._setRTS(HIGH)  # EN=HIGH, chip out of reset
+        if self.custom_hard_seq:
+            exec(self._parse_string_to_seq(self.custom_hard_seq))
+        else:
+            self._setRTS(LOW)  # EN=LOW, chip in reset
+            time.sleep(self.chip_config['reset'])
+            self._setRTS(HIGH)  # EN=HIGH, chip out of reset
 
     def to_bootloader(self) -> None:
         """Reset chip into bootloader"""
