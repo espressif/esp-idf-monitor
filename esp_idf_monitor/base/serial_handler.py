@@ -204,22 +204,22 @@ class SerialHandler:
 
         sp = self.splitdata(data)
         if self.binary_log_detected:
-            try:
-                text_lines, self._last_line_part = self.binlog.convert_to_text(sp[0])
-                for line in text_lines:
+            text_lines, self._last_line_part, leaked_text = self.binlog.convert_to_text(sp[0])
+            for line in text_lines:
+                self.print_colored(line)
+                self.logger.handle_possible_pc_address_in_line(line)
+                self.monitor_cmd_executor.execute_from_log_line(line)
+            if leaked_text:
+                leaked_lines = leaked_text.splitlines(keepends=True) or [b'']
+                if leaked_lines and not (leaked_lines[-1].endswith(b'\n') or leaked_lines[-1].endswith(b'\r')):
+                    incomplete = leaked_lines.pop()
+                    if not self._last_line_part:
+                        self._last_line_part = incomplete
+                for line in leaked_lines:
                     self.print_colored(line)
                     self.logger.handle_possible_pc_address_in_line(line)
                     self.monitor_cmd_executor.execute_from_log_line(line)
-                return
-            except ValueError:
-                # If no valid binary log frames were found, or if we have too much accumulated data
-                # without valid frames, exit binary log mode
-                self.binary_log_detected = False
-                # Process the accumulated data as regular text instead
-                accumulated_data = sp[0] if sp else b''
-                if accumulated_data:
-                    self._last_line_part = accumulated_data
-                    sp = self.splitdata(b'')  # Re-split the data normally
+            return
 
         for line in sp:
             line_strip = line.strip()

@@ -21,6 +21,8 @@ from typing import Tuple
 
 import pytest
 
+from esp_idf_monitor.base.binlog import BinaryLog
+
 from .conftest import out_dir
 
 if os.name != 'nt':
@@ -361,8 +363,17 @@ class TestHost(TestBaseClass):
             stderr = f_err.read()
         assert "--- Warning: ELF file 'non_existing.elf' does not exist" in stderr
 
+
+class TestBinaryLogging(TestBaseClass):
+    ELF_PATH = os.path.join(IN_DIR, 'log.elf')
+
+    VALID_FRAME = b'\x02\x0c\x10\x00\x00\x85\x9c\x3f\x40\x09\x9c\x00\x00\x01\x03\xd6'
+    VALID_FRAME_TEXT = b'I (259) example: >>> String Formatting Tests <<<\n'
+    # VALID_FRAME2_TEXT is "I (259) example: |Hello_world|"
+    VALID_FRAME2 = b'\x02\x0c\x14\x00\x00\x85\x94?@\t\x9c\x00\x00\x01\x03?@\nL\xa1'
+
     def test_binary_logging(self):
-        args = [os.path.join(IN_DIR, 'log.elf'), os.path.join(IN_DIR, 'bootloader.elf')]
+        args = [self.ELF_PATH, os.path.join(IN_DIR, 'bootloader.elf')]
         out, err = self.run_monitor(args, 'binlog', timeout=10)
         with open(err) as f_err:
             stderr = f_err.read()
@@ -376,7 +387,7 @@ class TestHost(TestBaseClass):
                     line_out = ansi_regex.sub('', line_out)
                 line_out = line_out.strip()
                 line_expected = line_expected.strip()
-                assert line_out == line_expected, f"Mismatch: {line_out} != {line_expected}"
+                assert line_out == line_expected, f'Mismatch: {line_out} != {line_expected}'
 
         if os.name == 'nt':
             # Windows test environment does not have toolchain installed
@@ -402,15 +413,14 @@ class TestHost(TestBaseClass):
             # Text after binary log (should be processed normally)
             f.write(b'I (1000) main: Application started\r\n')
             # Add some valid binary log data frame from inputs/binlog
-            # Should be decoded as "I (259) example: >>> String Formatting Tests <<<"
-            f.write(b'\x02\x0c\x10\x00\x00\x85\x9c\x3f\x40\x09\x9c\x00\x00\x01\x03\xd6')
+            f.write(self.VALID_FRAME)
 
         yield f.name
         os.unlink(f.name)
 
     def test_binary_log_invalid_data(self, invalid_binary_log: str):
         """Test the binary log with invalid data to make sure it is processed normally and not stuck"""
-        args = [os.path.join(IN_DIR, 'log.elf')]
+        args = [self.ELF_PATH]
         out, err = self.run_monitor(args, invalid_binary_log, timeout=15)
         print('Using binary log file: ', invalid_binary_log)
         with open(err) as f_err:
@@ -425,6 +435,87 @@ class TestHost(TestBaseClass):
             assert 'I (1000) main: Application started' in output
             # Valid binary log data frame should be decoded
             assert 'I (259) example: >>> String Formatting Tests <<<' in output
+
+    ### Unit tests for BinaryLog class ###
+
+    def test_find_frames_resync_after_corruption(self):
+        """Corrupted bytes between two valid frames: parser re-syncs and extracts both frames."""
+        corrupt = b'\xff\xff\x01\x02'  # noise that could look like frame start
+        data = self.VALID_FRAME + corrupt + self.VALID_FRAME2
+        binlog = BinaryLog([self.ELF_PATH])
+        frames, remaining, leaked_text = binlog.find_frames(data)
+        assert len(frames) == 2
+        assert frames[0] == self.VALID_FRAME
+        assert frames[1] == self.VALID_FRAME2
+        # Corrupt region is leaked (non-frame bytes between the two frames)
+        assert corrupt in leaked_text or len(leaked_text) >= len(corrupt)
+        assert remaining == b''
+
+    def test_find_frames_crc_mismatch_skipped_recovery(self):
+        """CRC mismatch: skip invalid frame and re-sync"""
+        # Valid frame, then same frame with last byte flipped (bad CRC), then valid again
+        bad_frame = self.VALID_FRAME[:-1] + bytes([self.VALID_FRAME[-1] ^ 0x01])
+        data = self.VALID_FRAME + bad_frame + self.VALID_FRAME2
+        binlog = BinaryLog([self.ELF_PATH])
+        frames, remaining, leaked_text = binlog.find_frames(data)
+        assert len(frames) == 2
+        assert frames[0] == self.VALID_FRAME
+        assert frames[1] == self.VALID_FRAME2
+        assert remaining == b''
+        assert leaked_text == bad_frame
+
+    def test_find_frames_truncated_frame_no_crash(self):
+        """Truncated frame (e.g. buffer cut mid-packet): no exception, partial not returned as frame."""
+        truncated = self.VALID_FRAME[:10]  # too short to be a full frame
+        binlog = BinaryLog([self.ELF_PATH])
+        frames, remaining, _ = binlog.find_frames(truncated)
+        assert len(frames) == 0
+        # Either carried as remaining (if plausible) or leaked
+        assert remaining == b'' or remaining == truncated
+
+    def test_find_frames_noise_byte_like_marker_skipped(self):
+        """Single 0x01 in middle of text: parser skips or recovers; no valid frame."""
+        # 0x01 in the middle; next bytes are ASCII so control may be implausible and we skip
+        text = b'ESP-ROM:esp32c3-api1-20210207\n'
+        data = text[:12] + b'\x01' + text[12:]
+        binlog = BinaryLog([self.ELF_PATH])
+        frames, remaining, leaked_text = binlog.find_frames(data)
+        assert len(frames) == 0
+        # Parser did not crash; no valid frame; data is either leaked or carried as remaining
+        assert len(leaked_text) > 0 or len(remaining) > 0
+        assert leaked_text + remaining == data
+
+    def test_find_frames_boot_log_leaked_after_last_frame(self):
+        """Reset mid-binary-log: boot log after last valid frame must appear in leaked_text."""
+        boot_log = b'ESP-ROM:esp32c3-api1-20210207\nBuild:Feb  7 2021\n'
+        data = self.VALID_FRAME + boot_log
+        binlog = BinaryLog([self.ELF_PATH])
+        frames, remaining, leaked_text = binlog.find_frames(data)
+        assert len(frames) == 1
+        assert frames[0] == self.VALID_FRAME
+        assert leaked_text == boot_log
+        assert remaining == b''
+
+    def test_convert_to_text_returns_leaked_text(self):
+        boot_log = b'ESP-ROM:esp32c3-api1-20210207\nBuild:Feb  7 2021\n'
+        data = self.VALID_FRAME + boot_log
+        binlog = BinaryLog([self.ELF_PATH])
+        messages, incomplete, leaked_text = binlog.convert_to_text(data)
+        assert len(messages) == 1
+        assert incomplete == b''
+        assert leaked_text == boot_log
+        # One decoded line from the valid frame
+        assert self.VALID_FRAME_TEXT == messages[0]
+
+    def test_find_frames_leaked_text_between_frames(self):
+        """Non-frame bytes between two valid frames are collected as leaked_text."""
+        between = b'noise-between\n'
+        data = self.VALID_FRAME + between + self.VALID_FRAME2
+        binlog = BinaryLog([self.ELF_PATH])
+        frames, remaining, leaked_text = binlog.find_frames(data)
+        assert len(frames) == 2
+        assert between in leaked_text
+        assert remaining == b''
 
 
 @pytest.mark.skipif(os.name == 'nt', reason='Linux/MacOS only')
