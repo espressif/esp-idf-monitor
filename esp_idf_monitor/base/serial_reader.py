@@ -5,6 +5,8 @@ import queue  # noqa: F401
 import subprocess  # noqa: F401
 import sys
 import time
+from typing import List  # noqa: F401
+from typing import Optional  # noqa: F401
 
 import serial
 from esp_pylib.logger import log
@@ -29,8 +31,8 @@ class SerialReader(Reader):
     event queue, until stopped.
     """
 
-    def __init__(self, serial_instance, event_queue, reset, open_port_attempts, target):
-        #  type: (serial.Serial, queue.Queue, bool, int, str) -> None
+    def __init__(self, serial_instance, event_queue, reset, open_port_attempts, target, port_candidates=None):
+        #  type: (serial.Serial, queue.Queue, bool, int, str, Optional[List[str]]) -> None
         super().__init__()
         self.baud = serial_instance.baudrate
         self.serial = serial_instance
@@ -38,6 +40,8 @@ class SerialReader(Reader):
         self.gdb_exit = False
         self.reset = reset
         self.open_port_attempts = open_port_attempts
+        self.port_candidates = list(port_candidates or [])
+        self.target = target
         self.reset_strategy = Reset(serial_instance, target)
         if not hasattr(self.serial, 'cancel_read'):
             # enable timeout for checking alive flag,
@@ -57,7 +61,9 @@ class SerialReader(Reader):
                 self.reset = False
             except (serial.SerialException, OSError) as e:
                 print(e)
-                if self.open_port_attempts == 1:
+                if self.try_next_port(reset=self.reset):
+                    self.reset = False
+                elif self.open_port_attempts == 1:
                     # If the connection to the port fails and --open-port-attempts was not specified,
                     # recommend other available ports and exit. get_port_names() already
                     # excludes the macOS virtual ports the legacy FILTERED_PORTS list
@@ -97,6 +103,34 @@ class SerialReader(Reader):
                     self.event_queue.put((TAG_SERIAL, data), False)
         finally:
             self.close_serial()
+
+    def _switch_port(self, port: str) -> None:
+        if self.serial.is_open:
+            self.close_serial()
+        self.serial.port = port
+        self.reset_strategy = Reset(self.serial, self.target)
+        if not hasattr(self.serial, 'cancel_read'):
+            self.serial.timeout = CHECK_ALIVE_FLAG_TIMEOUT
+
+    def try_next_port(self, reset: bool) -> bool:
+        if not self.port_candidates:
+            return False
+
+        current_port = self.serial.port
+        for port in self.port_candidates:
+            if port == current_port:
+                continue
+            log.note(f'Trying autodetected port {port}')
+            self._switch_port(port)
+            try:
+                self.open_serial(reset=reset)
+                log.note(f'Using autodetected port {port}')
+                return True
+            except (serial.SerialException, OSError) as e:
+                print(e)
+
+        self._switch_port(current_port)
+        return False
 
     def open_serial(self, reset: bool) -> None:
         # set the DTR/RTS into LOW prior open

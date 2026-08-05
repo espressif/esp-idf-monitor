@@ -46,6 +46,7 @@ from esp_pylib.excepthook import install_exception_reporting
 from esp_pylib.logger import log
 from esp_pylib.rom import get_rom_elf_path
 from esp_pylib.serial_ports import detect_port as _pylib_detect_port
+from esp_pylib.serial_ports import get_port_names
 from serial.tools import miniterm
 
 from esp_idf_monitor import __version__
@@ -128,6 +129,7 @@ class Monitor:
         disable_auto_color=False,  # type: bool
         rom_elf_file=None,  # type: Optional[str]
         non_interactive=False,  # type: bool
+        port_candidates=None,  # type: Optional[List[str]]
     ):
         self.event_queue = queue.Queue()  # type: queue.Queue
         self.cmd_queue = queue.Queue()  # type: queue.Queue
@@ -167,7 +169,9 @@ class Monitor:
 
         if isinstance(self, SerialMonitor):
             self.serial = serial_instance
-            self.serial_reader = SerialReader(self.serial, self.event_queue, reset, open_port_attempts, target)  # type: Reader
+            self.serial_reader = SerialReader(
+                self.serial, self.event_queue, reset, open_port_attempts, target, port_candidates
+            )  # type: Reader
 
             self.gdb_helper = (
                 GDBHelper(toolchain_prefix, websocket_client, self.elf_files, self.serial.port, self.serial.baudrate)
@@ -335,6 +339,8 @@ class Monitor:
 
         event_tag, data = item
         if event_tag == TAG_CMD:
+            if isinstance(self.serial_reader, SerialReader):
+                self.serial_handler.reset = self.serial_reader.reset_strategy
             self.serial_handler.handle_commands(
                 data, self.target, self.run_make, self.console_reader, self.serial_reader
             )
@@ -415,6 +421,9 @@ class SerialMonitor(Monitor):
             pass  # this can happen if a non-ascii character was passed, ignoring
 
     def check_gdb_stub_and_run(self, line: bytes) -> None:  # type: ignore # The base class one is a None value
+        if self.gdb_helper:
+            # Autodetection may have selected a fallback after this helper was constructed.
+            self.gdb_helper.port = self.serial.port
         if self.gdb_helper and self.gdb_helper.check_gdb_stub_trigger(line):
             if self.non_interactive:
                 # gdb would read from the same stdin as the CommandReader and
@@ -540,6 +549,7 @@ def _run_monitor(
     ws_client = WebSocketClient(ws) if ws else None
 
     elf_files_list = list(elf_files)
+    port_candidates = None  # type: Optional[List[str]]
 
     try:
         cls: Type[Monitor]
@@ -557,6 +567,8 @@ def _run_monitor(
             # If no port was given, detect connected ports and use one of them.
             if active_port is None:
                 active_port = detect_port()
+                port_candidates = [active_port]
+                port_candidates.extend(candidate for candidate in get_port_names() if candidate != active_port)
             # GDB uses CreateFile to open COM port, which requires the COM name
             # to be r'\\.\COMx' if the COM number is larger than 10.
             if os.name == 'nt' and active_port.startswith('COM'):
@@ -567,6 +579,17 @@ def _run_monitor(
                 active_port = active_port.replace('/dev/tty.', '/dev/cu.')
                 log.warn('Serial ports accessed as /dev/tty.* will hang gdb if launched.')
                 log.note(f'Using {active_port} instead...')
+
+            if port_candidates is not None:
+                normalized_candidates = []
+                for candidate in port_candidates:
+                    if os.name == 'nt' and candidate.startswith('COM'):
+                        candidate = candidate.replace('COM', r'\\.\COM')
+                    elif sys.platform == 'darwin' and candidate.startswith('/dev/tty.'):
+                        candidate = candidate.replace('/dev/tty.', '/dev/cu.')
+                    if candidate not in normalized_candidates:
+                        normalized_candidates.append(candidate)
+                port_candidates = normalized_candidates
 
             serial_instance = serial.serial_for_url(active_port, baud, do_not_open=True, exclusive=True)
             # setting write timeout is not supported for RFC2217 in pyserial
@@ -610,6 +633,7 @@ def _run_monitor(
             disable_auto_color,
             resolved_rom_elf,
             non_interactive,
+            port_candidates,
         )
 
         if save_log:
