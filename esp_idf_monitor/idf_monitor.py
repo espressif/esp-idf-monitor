@@ -28,7 +28,6 @@ import shlex
 import signal
 import subprocess
 import sys
-import threading
 import time
 from types import FrameType  # noqa: F401
 from typing import Callable  # noqa: F401
@@ -228,7 +227,7 @@ class Monitor:
         self._line_matcher = LineMatcher(print_filter)
 
         # internal state
-        self._invoke_processing_last_line_timer = None  # type: Optional[threading.Timer]
+        self._flush_deadline = None  # type: Optional[float]
         self._gdb_stub_warned = False
 
     def __enter__(self) -> None:
@@ -308,9 +307,7 @@ class Monitor:
                 self.console_reader.stop()
                 self.serial_reader.stop()
                 self.logger.stop_logging()
-                # Cancelling _invoke_processing_last_line_timer is not
-                # important here because receiving empty data doesn't matter.
-                self._invoke_processing_last_line_timer = None
+                self._flush_deadline = None
             except Exception:  # noqa
                 pass
             log.print('')  # newline
@@ -325,6 +322,10 @@ class Monitor:
         self.event_queue.put((TAG_SERIAL_FLUSH, b''), False)
 
     def _main_loop(self) -> None:
+        if self._flush_deadline is not None and time.monotonic() >= self._flush_deadline:
+            self._flush_deadline = None
+            self.invoke_processing_last_line()
+
         try:
             item = self.cmd_queue.get_nowait()
         except queue.Empty:
@@ -352,17 +353,7 @@ class Monitor:
                 self._line_matcher,
                 self.check_gdb_stub_and_run,
             )
-            if self._invoke_processing_last_line_timer is not None:
-                self._invoke_processing_last_line_timer.cancel()
-            self._invoke_processing_last_line_timer = threading.Timer(
-                LAST_LINE_THREAD_INTERVAL, self.invoke_processing_last_line
-            )
-            self._invoke_processing_last_line_timer.start()
-            # If no further data is received in the next short period
-            # of time then the _invoke_processing_last_line_timer
-            # generates an event which will result in the finishing of
-            # the last line. This is fix for handling lines sent
-            # without EOL.
+            self._flush_deadline = time.monotonic() + LAST_LINE_THREAD_INTERVAL
             # finalizing the line when coredump is in progress causes decoding issues
             # the espcoredump loader uses empty line as a sign for end-of-coredump
             # line is finalized only for non coredump data
