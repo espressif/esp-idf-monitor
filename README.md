@@ -87,6 +87,8 @@ printf 'reset\nexpect ALL TESTS PASSED\n' | idf-monitor /dev/ttyUSB0
 
 Empty lines and lines starting with `#` are ignored. Every processed command is echoed to **standard error**, so the progress of the script stays visible even when standard output is redirected to a file.
 
+If the monitor receives `SIGTERM` while a `flash`, `flash-all`, or `app-flash` command is running, it waits for the build to finish and then quits, so the build does not keep using the serial port after the monitor exits.
+
 The line ending is stripped before an `expect` match, so a `$` anchor works regardless of whether the device terminates lines with `LF` or `CRLF`.
 
 ### Examples

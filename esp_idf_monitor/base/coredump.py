@@ -63,6 +63,16 @@ class CoreDump:
             self._coredump_counter_ctx = None
             self._coredump_counter = None
 
+    def _notify_ide(self, coredump_path):
+        # type: (str) -> None
+        if self.websocket_client is None:
+            raise RuntimeError('Cannot hand core dump to the IDE: WebSocket client is not configured')
+        self.logger.output_enabled = True
+        self.websocket_client.roundtrip(
+            {'event': 'coredump', 'file': coredump_path, 'prog': self.elf_files},
+            'debug_finished',
+        )
+
     def _process_coredump(self):  # type: () -> None
         if self._decode_coredumps != COREDUMP_DECODE_INFO:
             raise NotImplementedError(f'process_coredump: {self._decode_coredumps} not implemented')
@@ -73,12 +83,10 @@ class CoreDump:
             coredump_file.flush()
 
         if self.websocket_client:
-            self.logger.output_enabled = True
-            log.note('Communicating through WebSocket')
-            self.websocket_client.send({'event': 'coredump', 'file': coredump_file.name, 'prog': self.elf_files})
-            log.note('Waiting for debug finished event')
-            self.websocket_client.wait([('event', 'debug_finished')])
-            log.note('Communications through WebSocket is finished')
+            # Keep the serial port open: the IDE decodes from the file named
+            # in the payload, and closing the port would drop the reboot log
+            # the chip prints after the panic.
+            self._notify_ide(coredump_file.name)
         else:
             try:
                 import esp_coredump

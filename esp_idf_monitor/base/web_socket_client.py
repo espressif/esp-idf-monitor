@@ -12,9 +12,9 @@ Dispatches between two backends:
   available because its ``websockets`` dependency requires Python >= 3.8.
 
 The public `WebSocketClient` keeps its historical
-``send(payload_dict)`` / ``wait(expect_iterable)`` / ``close()`` API so
-callers in `esp_idf_monitor.base.gdbhelper` and
-`esp_idf_monitor.base.coredump` need no changes. Both backends emit
+``send(payload_dict)`` / ``wait(expect_iterable)`` / ``close()`` API and
+adds ``roundtrip(payload_dict, wait_event)``, which sends an event and
+waits for the IDE reply. Both backends emit
 the same ``WebSocket sent: ...`` / ``WebSocket received: ...`` log lines
 the IDE integration target test (``pytest_monitor_ide_integration.py``)
 greps for.
@@ -73,6 +73,10 @@ def _pylib_available() -> bool:
     return True
 
 
+class WebSocketWaitInterrupted(KeyboardInterrupt):
+    """The request was sent, but waiting for the IDE was interrupted."""
+
+
 class _PylibBackend:
     """Backend that delegates to `esp_pylib.ws`."""
 
@@ -105,7 +109,7 @@ class _PylibBackend:
         # the call site passed in.
         log.note(f'WebSocket sent: {payload_dict}')
 
-    def wait(self, expect_iterable: Iterable[tuple[str, Any]]) -> None:
+    def wait(self, expect_iterable: Iterable[tuple[str, Any]]) -> Any:
         """Wait for an event matching ``expect_iterable``.
 
         Current callers only ever pass a single-tuple iterable like
@@ -114,6 +118,8 @@ class _PylibBackend:
         than silent best-effort matching. We raise
         `esp_pylib.errors.FatalError` to make that promotion an
         observable build failure.
+
+        Returns the received payload dict.
         """
         # Materialise once so we can both validate length and dispatch.
         expectations = list(expect_iterable)
@@ -128,6 +134,7 @@ class _PylibBackend:
         event_name = expectations[0][1]
         result = _pylib_ws.wait_for_event(event_name)
         log.note(f'WebSocket received: {result}')
+        return result
 
     def close(self) -> None:
         assert _pylib_ws is not None
@@ -190,7 +197,7 @@ class _LegacyBackend:
                 self._connect()
         raise RuntimeError('Cannot send to WebSocket server')
 
-    def wait(self, expect_iterable: Iterable[tuple[str, Any]]) -> None:
+    def wait(self, expect_iterable: Iterable[tuple[str, Any]]) -> Any:
         expectations = list(expect_iterable)
         for _ in range(self.RETRIES):
             try:
@@ -202,7 +209,7 @@ class _LegacyBackend:
             obj = json.loads(r)
             if all(k in obj and obj[k] == v for k, v in expectations):
                 log.note(f'WebSocket received: {obj}')
-                return
+                return obj
             log.err(f'WebSocket expected: {dict(expectations)}, received: {obj}')
         raise RuntimeError('Cannot receive from WebSocket server')
 
@@ -237,8 +244,34 @@ class WebSocketClient:
     def send(self, payload_dict: dict[str, Any]) -> None:
         self._impl.send(payload_dict)
 
-    def wait(self, expect_iterable: Iterable[tuple[str, Any]]) -> None:
-        self._impl.wait(expect_iterable)
+    def wait(self, expect_iterable: Iterable[tuple[str, Any]]) -> Any:
+        return self._impl.wait(expect_iterable)
+
+    def roundtrip(self, payload_dict: dict[str, Any], wait_event: str) -> Any:
+        """Send ``payload_dict`` and block until ``wait_event`` arrives.
+
+        Emits the same ``Communicating through WebSocket`` /
+        ``Waiting for ...`` / ``Communications through WebSocket is finished``
+        log lines that the IDE integration target test greps for.
+        Returns the received payload dict.
+
+        Raises `WebSocketWaitInterrupted` on Ctrl+C once ``send()`` has
+        started, so callers keep the serial port released until the IDE
+        replies. Ctrl+C before ``send()`` stays a plain ``KeyboardInterrupt``:
+        the IDE was never asked to reply.
+        """
+        log.note('Communicating through WebSocket')
+        try:
+            self.send(payload_dict)
+            # Keep the historical phrasing for debug_finished so target tests
+            # that expect "Waiting for debug finished event" keep matching.
+            wait_label = wait_event.replace('_', ' ')
+            log.note(f'Waiting for {wait_label} event')
+            result = self.wait([('event', wait_event)])
+        except KeyboardInterrupt as e:
+            raise WebSocketWaitInterrupted from e
+        log.note('Communications through WebSocket is finished')
+        return result
 
     def close(self) -> None:
         self._impl.close()

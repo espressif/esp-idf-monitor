@@ -1296,6 +1296,31 @@ class TestFlashAllCommands:
         assert captured['args'] == ['python', 'idf.py', 'flash']
         assert captured['env']['IDF_FLASH_FULL'] == '1'
 
+    def test_run_make_waits_for_build_before_abort_propagates(self, monkeypatch):
+        """A stop raised while waiting (SIGTERM in Command-Stream Mode) lets the build finish first."""
+        from esp_idf_monitor.base import serial_handler
+
+        class Abort(BaseException):
+            pass
+
+        class FakePopen:
+            returncode = 0
+            waits = 0
+
+            def __init__(self, args, env=None):
+                pass
+
+            def wait(self):
+                FakePopen.waits += 1
+                if FakePopen.waits == 1:
+                    raise Abort
+                return self.returncode
+
+        monkeypatch.setattr(serial_handler.subprocess, 'Popen', FakePopen)
+        with pytest.raises(Abort):
+            self._run_make()
+        assert FakePopen.waits == 2
+
     def test_flash_all_dispatch_sets_full_flash_env(self):
         """CMD_FLASH_ALL runs the flash target with IDF_FLASH_FULL=1; other paths set no env."""
         from esp_idf_monitor.base.serial_handler import SerialHandler

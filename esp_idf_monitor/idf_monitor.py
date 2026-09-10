@@ -31,6 +31,7 @@ import sys
 import threading
 import time
 from types import FrameType  # noqa: F401
+from typing import Any
 from typing import Callable  # noqa: F401
 from typing import Dict  # noqa: F401
 from typing import List  # noqa: F401
@@ -91,6 +92,7 @@ from esp_idf_monitor.base.serial_reader import Reader  # noqa: F401
 from esp_idf_monitor.base.serial_reader import SerialReader  # noqa: F401
 from esp_idf_monitor.base.stoppable_thread import StoppableThread  # noqa: F401
 from esp_idf_monitor.base.web_socket_client import WebSocketClient
+from esp_idf_monitor.base.web_socket_client import WebSocketWaitInterrupted
 from esp_idf_monitor.config import Config
 
 key_description = miniterm.key_description
@@ -105,6 +107,16 @@ def _create_console(command_stream_mode: bool):
         # pyserial's Windows Console replaces stderr with a UTF-8 writer that
         # has no isatty(), which makes Rich disable colors for monitor messages.
         sys.stderr = real_stderr
+
+
+class _MonitorAbort(BaseException):
+    """Stop the monitor without reopening the serial port.
+
+    Raised on SIGTERM in Command-Stream Mode and on a second Ctrl+C while
+    waiting for the IDE, which may still hold the port. Derives from
+    `BaseException`, like `KeyboardInterrupt`, so the ``except Exception``
+    reconnect handlers in the WebSocket transports do not swallow it.
+    """
 
 
 class Monitor:
@@ -162,6 +174,7 @@ class Monitor:
 
         self.elf_files = elf_files or []
         self.elf_exists = self._check_elfs()
+        self.websocket_client = websocket_client
         self.logger = Logger(
             self.elf_files,
             self.console,
@@ -188,7 +201,7 @@ class Monitor:
             self.serial_reader = SerialReader(self.serial, self.event_queue, reset, open_port_attempts, target)  # type: Reader
 
             self.gdb_helper = (
-                GDBHelper(toolchain_prefix, websocket_client, self.elf_files, self.serial.port, self.serial.baudrate)
+                GDBHelper(toolchain_prefix, self.elf_files, self.serial.port, self.serial.baudrate)
                 if self.elf_exists
                 else None
             )
@@ -290,18 +303,40 @@ class Monitor:
                 env_extra=env_extra,
             )
 
+    def _ide_roundtrip(self, payload: Dict[str, Any], wait_event: str, still_waiting: str) -> Any:
+        """Send ``payload`` to the IDE and return its reply to ``wait_event``.
+
+        Call inside ``with self`` so the serial port stays released. Ctrl+C
+        after sending has started keeps waiting, because the IDE may
+        already be using the port and there is no cancel event. A further
+        Ctrl+C raises `_MonitorAbort`, which quits without reopening the port.
+        """
+        if self.websocket_client is None:
+            raise RuntimeError('Cannot wait for the IDE: WebSocket client is not configured')
+        try:
+            return self.websocket_client.roundtrip(payload, wait_event)
+        except WebSocketWaitInterrupted:
+            # Keep the note inside the same try as the second wait so a further
+            # Ctrl+C still aborts without reclaiming the port.
+            try:
+                log.note(still_waiting)
+                return self.websocket_client.wait([('event', wait_event)])
+            except KeyboardInterrupt as e:
+                raise _MonitorAbort from e
+
     def _pre_start(self) -> None:
         self.console_reader.start()
         self.serial_reader.start()
 
     def main_loop(self) -> None:
         if self.command_stream_mode:
-            # SIGTERM is how Docker/CI stop processes; reuse the Ctrl+C
-            # (KeyboardInterrupt) clean-shutdown path so the log file is
-            # flushed and closed. The default action would kill the process
-            # without running any cleanup.
+            # SIGTERM is how Docker/CI stop processes. The default action would
+            # kill the process without running cleanup. Raise `_MonitorAbort`
+            # rather than KeyboardInterrupt so a stop during an IDE handoff does
+            # not reopen a serial port the IDE may hold. Interactive Ctrl+C
+            # stays a KeyboardInterrupt (two-stage wait during handoff).
             def _sigterm_handler(signum: int, frame: Optional[FrameType]) -> None:
-                raise KeyboardInterrupt
+                raise _MonitorAbort
 
             signal.signal(signal.SIGTERM, _sigterm_handler)
         self._pre_start()
@@ -319,7 +354,7 @@ class Monitor:
                         f'you can use {key_description(MENU_KEY)} {key_description(EXIT_MENU_KEY)} to exit.'
                     )
                     self.serial_write(codecs.encode(CTRL_C))
-        except KeyboardInterrupt:
+        except (KeyboardInterrupt, _MonitorAbort):
             pass
         finally:
             try:
@@ -401,6 +436,8 @@ class Monitor:
 class SerialMonitor(Monitor):
     def __exit__(self, exc_type, exc_val, exc_tb) -> None:  # type: ignore
         """Use 'with self' to temporarily disable monitoring behaviour"""
+        if exc_type is not None and issubclass(exc_type, _MonitorAbort):
+            return
         if not self.command_stream_mode:
             # the CommandReader was not stopped in __enter__
             self.console_reader.start()
@@ -433,18 +470,27 @@ class SerialMonitor(Monitor):
             pass  # this can happen if a non-ascii character was passed, ignoring
 
     def check_gdb_stub_and_run(self, line: bytes) -> None:  # type: ignore # The base class one is a None value
-        if self.gdb_helper and self.gdb_helper.check_gdb_stub_trigger(line):
-            if self.command_stream_mode:
-                # gdb would read from the same stdin as the CommandReader and
-                # there is no terminal for an interactive session anyway
-                if not self._gdb_stub_warned:
-                    log.warn(
-                        'GDB stub detected, but an interactive GDB session cannot be started in Command-Stream Mode'
-                    )
-                    self._gdb_stub_warned = True
-                return
-            with self:  # disable console control
-                self.gdb_helper.run_gdb()
+        if not (self.gdb_helper and self.gdb_helper.check_gdb_stub_trigger(line)):
+            return
+        # IDE handoff first: pause the serial reader so the IDE can open the
+        # port, then send gdb_stub and wait for debug_finished.
+        if self.websocket_client:
+            with self:
+                self._ide_roundtrip(
+                    {'event': 'gdb_stub', 'port': self.serial.port, 'prog': self.elf_files[0]},
+                    'debug_finished',
+                    'Still waiting for the IDE to finish debugging',
+                )
+            return
+        if self.command_stream_mode:
+            # gdb would read from the same stdin as the CommandReader and
+            # there is no terminal for an interactive session anyway
+            if not self._gdb_stub_warned:
+                log.warn('GDB stub detected, but an interactive GDB session cannot be started in Command-Stream Mode')
+                self._gdb_stub_warned = True
+            return
+        with self:  # disable console control
+            self.gdb_helper.run_gdb()
 
     def _main_loop(self) -> None:
         if self.elf_exists and self.gdb_helper.gdb_exit:  # type: ignore
@@ -460,6 +506,8 @@ class SerialMonitor(Monitor):
 class LinuxMonitor(Monitor):
     def __exit__(self, exc_type, exc_val, exc_tb) -> None:  # type: ignore
         """Use 'with self' to temporarily disable monitoring behaviour"""
+        if exc_type is not None and issubclass(exc_type, _MonitorAbort):
+            return
         if not self.command_stream_mode:
             # the CommandReader was not stopped in __enter__
             self.console_reader.start()
@@ -667,7 +715,7 @@ def _run_monitor(
         # processed, so it is up to date here.
         if isinstance(monitor.console_reader, CommandReader):
             exit_code = monitor.console_reader.exit_code
-    except KeyboardInterrupt:
+    except (KeyboardInterrupt, _MonitorAbort):
         pass
     finally:
         if ws_client:

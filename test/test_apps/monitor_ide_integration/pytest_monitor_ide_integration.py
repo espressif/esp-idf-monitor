@@ -1,4 +1,4 @@
-# SPDX-FileCopyrightText: 2022-2023 Espressif Systems (Shanghai) CO LTD
+# SPDX-FileCopyrightText: 2022-2026 Espressif Systems (Shanghai) CO LTD
 # SPDX-License-Identifier: Unlicense OR CC0-1.0
 import itertools
 import json
@@ -6,6 +6,7 @@ import logging
 import multiprocessing
 import os
 import re
+from typing import Dict
 from typing import List
 
 import pexpect
@@ -24,7 +25,7 @@ class IDEWSProtocol(WebSocket):
             return
         event = j.get('event')
         if event and 'prog' in j and ((event == 'gdb_stub' and 'port' in j) or (event == 'coredump' and 'file' in j)):
-            payload = {'event': 'debug_finished'}
+            payload: Dict[str, object] = {'event': 'debug_finished'}
             self.sendMessage(json.dumps(payload))
             logging.info(f'Server sent: {payload}')
         else:
