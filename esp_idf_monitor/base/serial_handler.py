@@ -71,7 +71,7 @@ def run_make(
     event_queue,
     cmd_queue,
     logger,
-    non_interactive=False,
+    command_stream_mode=False,
     env_extra=None,
 ):
     # type: (str, Union[str, List[str]], miniterm.Console, ConsoleParser, queue.Queue, queue.Queue, Logger, bool, Optional[Dict[str, str]]) -> None
@@ -89,7 +89,7 @@ def run_make(
     except KeyboardInterrupt:
         p.wait()
     if p.returncode != 0:
-        if non_interactive:
+        if command_stream_mode:
             # cannot prompt for the next action without a TTY on stdin
             log.err('Build failed')
         else:

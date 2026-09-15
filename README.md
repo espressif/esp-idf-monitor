@@ -13,7 +13,7 @@ Other advanced topics like configuration file will be described in the following
 
 - [Installation](#installation)
 - [Usage](#usage)
-- [Non-Interactive (Scripting) Mode](#non-interactive-scripting-mode)
+- [Command-Stream Mode](#command-stream-mode)
 - [Configuration File](#configuration-file)
   - [File Location](#file-location)
   - [Configuration Options](#configuration-options)
@@ -57,9 +57,9 @@ python -m esp_idf_monitor
 
 For all parameters and their function please see `idf-monitor --help`.
 
-## Non-Interactive (Scripting) Mode
+## Command-Stream Mode
 
-The interactive key bindings require a terminal (TTY) on standard input. When standard input is **not** a TTY — for example a pipe, a file, or when the monitor runs in a CI job or a Docker container — the monitor automatically switches to a **non-interactive command mode** instead of exiting with an error. In this mode it reads line-based commands from standard input, so the monitor can be driven by a shell script, a CI job, or another program, while keeping all of its added value (log decoding, coloring, logging to a file).
+The interactive key bindings require a terminal (TTY) on standard input. When standard input is **not** a TTY — for example a pipe, a file, or when the monitor runs in a CI job or a Docker container — the monitor automatically switches to **Command-Stream Mode** instead of exiting with an error. In this mode it reads line-based commands from standard input, so the monitor can be driven by a shell script, a CI job, or another program, while keeping all of its added value (log decoding, coloring, logging to a file).
 
 There are no extra command-line options: the mode is selected automatically based on whether standard input is a TTY.
 
@@ -130,7 +130,7 @@ idf-monitor --save-log /dev/ttyUSB0 < /dev/null
 ```
 
 > [!NOTE]
-> Because there is no terminal, an interactive GDB session cannot be started from the chip-side GDB stub while running in non-interactive mode.
+> Because there is no terminal, an interactive GDB session cannot be started from the chip-side GDB stub while running in Command-Stream Mode.
 
 ## Configuration File
 

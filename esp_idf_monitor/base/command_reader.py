@@ -41,8 +41,8 @@ class CommandReader(StoppableThread):
     """Read line-based commands from a non-TTY stdin (pipe, file) and push the
     corresponding events to the event queue, until EOF or the 'exit' command.
 
-    This is the non-interactive counterpart of ConsoleReader and allows the
-    monitor to be driven by a script or another program::
+    This is the Command-Stream Mode counterpart of ConsoleReader and allows
+    the monitor to be driven by a script or another program::
 
         printf 'reset\\nsleep 10\\nexit\\n' | python -m esp_idf_monitor /dev/ttyUSB0
 
