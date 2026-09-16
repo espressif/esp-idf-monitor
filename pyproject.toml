@@ -71,7 +71,6 @@ target_test = [
 ]
 host_test = [
     'pytest',
-    'pytest-rerunfailures',
     'esptool'
 ]
 

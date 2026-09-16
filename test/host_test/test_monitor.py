@@ -4,7 +4,6 @@
 # SPDX-License-Identifier: Apache-2.0
 import codecs
 import datetime
-import errno
 import filecmp
 import io
 import os
@@ -62,21 +61,6 @@ IN_DIR = os.path.join(os.path.abspath(os.path.dirname(__file__)), 'inputs')  # i
 STOP_MARKER = 'ESP_IDF_MONITOR_STOP'
 
 
-def on_timeout(process):
-    if process.poll() is not None:
-        # process has already ended
-        return
-    try:
-        process.kill()
-        pytest.fail('Monitor timed out')
-    except OSError as e:
-        if e.errno == errno.ESRCH:
-            # ignores a possible race condition which can occur when the process exits between poll() and kill()
-            pass
-        else:
-            raise
-
-
 def filename_fix(input_filename: str) -> str:
     """Remove invalid characters from filename on Windows"""
     if os.name == 'nt':
@@ -91,6 +75,11 @@ class TestBaseClass:
     master_fd: Optional[int]
     slave_fd: Optional[int]
     proc: subprocess.Popen
+    clientsocket: Optional[socket.socket]
+    serversocket: socket.socket
+    out: str
+    err: str
+    rfc2217_log: str
 
     def send_control(self, sequence: str):
         """Send a control sequence to monitor STDIN
@@ -104,35 +93,103 @@ class TestBaseClass:
             byte += bytes([ord(c) - ord('@')])
         os.write(self.master_fd, byte)
 
-    def close_monitor_async(self, timeout: int = 5) -> Optional[int]:
-        """Close monitor running in async mode and get the return code"""
-        # close monitor
-        self.send_control(']')
+    def _output_contents(self, path: str) -> str:
+        try:
+            with open(path, errors='replace') as output:
+                return output.read()
+        except OSError:
+            return ''
 
-        ret: Optional[int] = None
-        for _ in range(timeout):
-            ret = self.proc.poll()
-            if ret is not None:
-                break
-            time.sleep(1)
+    def wait_for_output(self, path: str, needle: str, count: int = 1, timeout: float = 15) -> bool:
+        """Wait until the monitor writes needle into path at least count times."""
+        deadline = time.monotonic() + timeout
+        while time.monotonic() < deadline:
+            if self._output_contents(path).count(needle) >= count:
+                return True
+            if self.proc.poll() is not None:
+                # the needle may have been written right before the process exited
+                return self._output_contents(path).count(needle) >= count
+            time.sleep(0.1)
+        return False
+
+    def wait_for_exit(self, timeout: float, err: str) -> int:
+        """Wait for the monitor and kill it on timeout with useful diagnostics."""
+        try:
+            self.proc.wait(timeout=timeout)
+        except subprocess.TimeoutExpired:
+            self.proc.kill()
+            self.proc.wait()
+            pytest.fail(f'Monitor timed out after {timeout}s.\nStderr:\n{self._output_contents(err)}')
+        return self.proc.returncode
+
+    def _accept_monitor_connection(self, timeout: float = 20) -> socket.socket:
+        """Accept the serial-port connection of the monitor (or of the RFC2217 server in between)."""
+        self.serversocket.settimeout(timeout)
+        try:
+            clientsocket: socket.socket = self.serversocket.accept()[0]
+        except socket.timeout:
+            self.proc.kill()
+            self.proc.wait()
+            pytest.fail(f'Monitor did not connect within {timeout}s.\nStderr:\n{self._output_contents(self.err)}')
+        return clientsocket
+
+    def _wait_monitor_ready(self, custom_port: str = '') -> None:
+        """Wait until serial-port initialization has completed."""
+        if custom_port.startswith('rfc2217://'):
+            ready_path = self.rfc2217_log
+            # The first reset-buffer entry is from the RFC2217 server opening
+            # its socket backend. The second is requested by the monitor after
+            # RFC2217 negotiation, so serial data is safe to send only then.
+            ready = self.wait_for_output(ready_path, 'ignored reset_output_buffer', count=2)
         else:
-            pytest.fail(f'Monitor took longer than {timeout} seconds to exit')
-        return ret
+            ready_path = self.err
+            # The first DTR(False) update comes from the monitor setting the lines
+            # high after pyserial's open(), i.e. after its reset_input_buffer call.
+            # Waiting for the DTR(True) update logged by open() itself can race with
+            # that buffer flush and discard the beginning of test input.
+            ready = self.wait_for_output(ready_path, 'ignored _update_dtr_state(False)')
+        if not ready:
+            if self.proc.poll() is None:
+                self.proc.kill()
+                self.proc.wait()
+            pytest.fail(
+                f'Monitor did not become ready.\n'
+                f'Stderr:\n{self._output_contents(self.err)}\n'
+                f'Readiness log:\n{self._output_contents(ready_path)}'
+            )
 
-    def run_monitor_async(self, args: List[str] = [], custom_port: str = '') -> Tuple[str, str]:
+    def close_monitor_async(self, timeout: int = 15) -> int:
+        """Close monitor running in async mode and get the return code"""
+        self.send_control(']')
+        return self.wait_for_exit(timeout, self.err)
+
+    def _monitor_cmd(self, args: Optional[List[str]], custom_port: str, no_reset: bool) -> List[str]:
+        """Build the monitor command line.
+
+        With no_reset, the startup hard reset is skipped, so the pyserial log of
+        a test contains only the control-line changes the test triggers itself.
+        """
+        monitor_args = list(args or [])
+        if no_reset and '--no-reset' not in monitor_args:
+            monitor_args.append('--no-reset')
+        return [
+            sys.executable,
+            '-m',
+            'esp_idf_monitor',
+            '--port',
+            custom_port if custom_port else f'socket://{HOST}:{self.port}?logging=debug',
+        ] + monitor_args
+
+    def run_monitor_async(
+        self, args: Optional[List[str]] = None, custom_port: str = '', no_reset: bool = True
+    ) -> Tuple[str, str]:
         """Run the monitor asynchronously in interactive mode (stdin on a PTY).
 
         The monitor keeps running after this returns; drive it with
         send_control() and stop it with close_monitor_async(). Returns the
         stdout and stderr filenames.
         """
-        cmd = [
-            sys.executable,
-            '-m',
-            'esp_idf_monitor',
-            '--port',
-            custom_port if custom_port else f'socket://{HOST}:{self.port}?logging=debug',
-        ] + args
+        cmd = self._monitor_cmd(args, custom_port, no_reset)
         output_file = os.path.join(out_dir, filename_fix(self.test_name))
         if os.name == 'nt':
             self.master_fd, self.slave_fd = None, None
@@ -141,12 +198,18 @@ class TestBaseClass:
             self.master_fd, self.slave_fd = pty.openpty()
         with open(f'{output_file}.out', 'w') as o_f, open(f'{output_file}.err', 'w') as e_f:
             self.proc = subprocess.Popen(cmd, stdin=self.slave_fd, stdout=o_f, stderr=e_f)
-        # make sure monitor is running before sending data
-        time.sleep(3 if os.name == 'nt' else 1)
-        return f'{output_file}.out', f'{output_file}.err'
+        self.out = f'{output_file}.out'
+        self.err = f'{output_file}.err'
+        self.clientsocket = self._accept_monitor_connection()
+        self._wait_monitor_ready(custom_port)
+        return self.out, self.err
 
     def run_monitor_command_mode(
-        self, args: List[str] = [], custom_port: str = '', stdin: int = subprocess.PIPE
+        self,
+        args: Optional[List[str]] = None,
+        custom_port: str = '',
+        stdin: int = subprocess.PIPE,
+        no_reset: bool = True,
     ) -> Tuple[str, str]:
         """Run the monitor in non-interactive command mode.
 
@@ -154,22 +217,17 @@ class TestBaseClass:
         line-based commands from it (CommandReader). The monitor keeps running
         after this returns. Returns the stdout and stderr filenames.
         """
-        cmd = [
-            sys.executable,
-            '-m',
-            'esp_idf_monitor',
-            '--port',
-            custom_port if custom_port else f'socket://{HOST}:{self.port}?logging=debug',
-        ] + args
+        cmd = self._monitor_cmd(args, custom_port, no_reset)
         # no PTY here: command mode is exactly the "stdin is not a TTY" path
         self.master_fd, self.slave_fd = None, None
         output_file = os.path.join(out_dir, filename_fix(self.test_name))
         with open(f'{output_file}.out', 'w') as o_f, open(f'{output_file}.err', 'w') as e_f:
             self.proc = subprocess.Popen(cmd, stdin=stdin, stdout=o_f, stderr=e_f)
-        # let the monitor start up and finish the initial reset (which flushes
-        # the serial input buffer) before the test sends serial data
-        time.sleep(3 if os.name == 'nt' else 1)
-        return f'{output_file}.out', f'{output_file}.err'
+        self.out = f'{output_file}.out'
+        self.err = f'{output_file}.err'
+        self.clientsocket = self._accept_monitor_connection()
+        self._wait_monitor_ready(custom_port)
+        return self.out, self.err
 
     def strip_marker(self, path: str) -> None:
         """Remove the stop-marker line (injected by run_monitor) from the output."""
@@ -179,7 +237,7 @@ class TestBaseClass:
             f.writelines(line for line in lines if STOP_MARKER.encode() not in line)
 
     def run_monitor(
-        self, args: List[str], input_file: str, custom_port: str = '', timeout: int = 60
+        self, args: List[str], input_file: str, custom_port: str = '', timeout: int = 60, no_reset: bool = True
     ) -> Tuple[str, str]:
         """Run IDF Monitor over an input file with a timeout.
 
@@ -189,10 +247,7 @@ class TestBaseClass:
         input has been decoded and printed. The marker line is stripped from the
         captured stdout. Returns the stdout and stderr filenames.
         """
-        out, err = self.run_monitor_command_mode(args, custom_port=custom_port)
-        # create a timer
-        monitor_watchdog = threading.Timer(timeout, on_timeout, [self.proc])
-        monitor_watchdog.start()
+        out, err = self.run_monitor_command_mode(args, custom_port=custom_port, no_reset=no_reset)
 
         # make sure that monitor is running, else we will end in an infinite loop
         if self.proc.poll() is not None:
@@ -201,26 +256,26 @@ class TestBaseClass:
         # arm 'expect' for the stop marker; the following EOF makes the monitor
         # exit once the marker is seen
         self.proc.stdin.write(f'expect {STOP_MARKER}\n'.encode())
+        self.proc.stdin.flush()
         self.proc.stdin.close()
+        command_message = f"Command: 'expect {STOP_MARKER}'"
+        assert self.wait_for_output(err, command_message), (
+            f'Monitor did not arm the expect command.\nStderr:\n{self._output_contents(err)}'
+        )
         # send input file content to socket
-        clientsocket, _ = self.serversocket.accept()
+        assert self.clientsocket is not None
         try:
             with open(os.path.join(IN_DIR, input_file), 'rb') as f:
                 for chunk in iter(lambda: f.read(1024), b''):
-                    clientsocket.sendall(chunk)
+                    self.clientsocket.sendall(chunk)
             # marker as the last serial line: once it is decoded, all of the
             # input has been processed
-            clientsocket.sendall(f'{STOP_MARKER}\n'.encode())
-            # wait for process to end
-            while True:
-                ret = self.proc.poll()
-                if ret is not None:
-                    break
-                time.sleep(1)
+            self.clientsocket.sendall(f'{STOP_MARKER}\n'.encode())
+            ret = self.wait_for_exit(timeout, err)
             assert ret == 0
-            monitor_watchdog.cancel()
         finally:
-            clientsocket.close()
+            self.clientsocket.close()
+            self.clientsocket = None
         # drop the marker line so the captured output matches the golden files
         self.strip_marker(out)
         return out, err
@@ -243,7 +298,18 @@ class TestBaseClass:
                 os.unlink(expected_out)
 
     def teardown_method(self):
-        """Class teardown method to cleanup pseudo-tty used for STDIN"""
+        """Clean up subprocess, socket and pseudo-tty resources after every test."""
+        proc = getattr(self, 'proc', None)
+        if proc is not None and proc.poll() is None:
+            proc.kill()
+            proc.wait()
+        clientsocket = getattr(self, 'clientsocket', None)
+        if clientsocket is not None:
+            try:
+                clientsocket.close()
+            except OSError:
+                pass
+            self.clientsocket = None
         if os.name != 'nt':
             try:
                 os.close(self.slave_fd)
@@ -265,6 +331,7 @@ class TestBaseClass:
     @pytest.fixture(autouse=True)
     def get_port(self):
         """Create an new connection"""
+        self.clientsocket = None
         self.serversocket = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
         self.serversocket.bind((HOST, 0))
         self.port = self.serversocket.getsockname()[1]
@@ -286,12 +353,39 @@ class TestHost(TestBaseClass):
         s.bind(('', 0))
         rfc2217_port = str(s.getsockname()[1])
         s.close()
-        cmd = ' '.join(['esp_rfc2217_server.py', '-p', rfc2217_port, f'socket://{HOST}:{self.port}?logging=debug'])
-        p = subprocess.Popen(cmd, shell=True)
-        # wait for the server to start
-        time.sleep(2)
-        yield f'rfc2217://{HOST}:{rfc2217_port}?ign_set_control'
-        p.terminate()
+        cmd = [
+            sys.executable,
+            '-m',
+            'esp_rfc2217_server',
+            '-p',
+            rfc2217_port,
+            f'socket://{HOST}:{self.port}?logging=debug',
+        ]
+        self.rfc2217_log = os.path.join(out_dir, f'{filename_fix(self.test_name)}_rfc2217_server.log')
+        env = os.environ.copy()
+        env['PYTHONUNBUFFERED'] = '1'
+        with open(self.rfc2217_log, 'w') as server_log:
+            p = subprocess.Popen(cmd, stdout=server_log, stderr=subprocess.STDOUT, env=env)
+            deadline = time.monotonic() + 15
+            while time.monotonic() < deadline:
+                if 'Waiting for connection' in self._output_contents(self.rfc2217_log):
+                    break
+                if p.poll() is not None:
+                    pytest.fail(f'RFC2217 server exited during startup:\n{self._output_contents(self.rfc2217_log)}')
+                time.sleep(0.1)
+            else:
+                p.kill()
+                p.wait()
+                pytest.fail(f'RFC2217 server did not become ready:\n{self._output_contents(self.rfc2217_log)}')
+            try:
+                yield f'rfc2217://{HOST}:{rfc2217_port}?ign_set_control'
+            finally:
+                p.terminate()
+                try:
+                    p.wait(timeout=5)
+                except subprocess.TimeoutExpired:
+                    p.kill()
+                    p.wait()
 
     # fmt: off
     @pytest.mark.parametrize(
@@ -306,7 +400,6 @@ class TestHost(TestBaseClass):
         ]
     )
     # fmt: on
-    @pytest.mark.flaky(reruns=2)
     def test_print_filter(self, input_file: str, filter_pattern: str, expected_out: str, timeout: int):
         """Test monitor filtering feature"""
         args = ['--print_filter', filter_pattern]
@@ -330,21 +423,20 @@ class TestHost(TestBaseClass):
         """Test monitor auto-coloring feature with mixed line endings and delay in the middle of line"""
         # run monitor on empty input
         out, err = self.run_monitor_async()
-        clientsocket, _ = self.serversocket.accept()
+        assert self.clientsocket is not None
         try:
-            clientsocket.send(b'I (1234) start of the line, ')
-            time.sleep(1)  # wait for message to be processed
-            clientsocket.send(b'continue on the next line\n')
-            clientsocket.send(b'W (1234) mixed line endings\r\n')
-            time.sleep(0.5)
+            self.clientsocket.send(b'I (1234) start of the line, ')
+            time.sleep(1)  # intentional delay in the middle of the line
+            self.clientsocket.send(b'continue on the next line\n')
+            self.clientsocket.send(b'W (1234) mixed line endings\r\n')
+            assert self.wait_for_output(out, 'mixed line endings')
             self.send_control('TI')  # toggle timestamps
-            clientsocket.send(b'E (1234) error log with a timestamp\n')
-            time.sleep(1)  # wait for messages to be processed
-            self.send_control(']')  # close monitor
-            time.sleep(1)
+            self.clientsocket.send(b'E (1234) error log with a timestamp\n')
+            assert self.wait_for_output(out, 'error log with a timestamp')
             assert self.close_monitor_async() == 0
         finally:
-            clientsocket.close()
+            self.clientsocket.close()
+            self.clientsocket = None
         with open(out) as f_out:
             output = f_out.read()
         assert '\033[0;32mI (1234) start of the line, continue on the next line\033[0m\n' in output
@@ -357,9 +449,8 @@ class TestHost(TestBaseClass):
     @pytest.mark.skipif(os.name == 'nt', reason='Linux/MacOS only')
     def test_rfc2217(self, rfc2217: str):
         """Run monitor with RFC2217 port"""
-        # run with no reset because it is not supported for socket ports
         input_file = 'in1.txt'
-        out, err = self.run_monitor(['--no-reset'], input_file, custom_port=rfc2217)
+        out, err = self.run_monitor([], input_file, custom_port=rfc2217)
         with open(err) as f:
             stderr = f.read()
         # check if monitor is running on RFC2217 port
@@ -376,11 +467,12 @@ class TestHost(TestBaseClass):
         out, err = self.run_monitor_async()
         self.send_control('TJ')  # unknown command
         self.send_control('TA')  # make app-flash
-        time.sleep(1)  # wait for make to run
+        assert self.wait_for_output(err, 'Running make app-flash...')
+        assert self.wait_for_output(err, 'Press any other key to resume monitor')
         self.send_control('T')  # press any key to reset
         self.send_control('TF')  # make flash
-        time.sleep(1)  # wait for make to run
-        self.send_control('TX')
+        assert self.wait_for_output(err, 'Running make flash...')
+        assert self.wait_for_output(err, 'Press any other key to resume monitor', count=2)
         assert self.close_monitor_async() == 0
 
         with open(err) as f_err:
@@ -394,8 +486,8 @@ class TestHost(TestBaseClass):
         """Run monitor with full flash (Ctrl-T Ctrl-E) command"""
         out, err = self.run_monitor_async()
         self.send_control('TE')  # make full flash
-        time.sleep(1)  # wait for make to run
-        self.send_control('TX')
+        assert self.wait_for_output(err, 'Running make flash...')
+        assert self.wait_for_output(err, 'Press any other key to resume monitor')
         assert self.close_monitor_async() == 0
 
         with open(err) as f_err:
@@ -408,24 +500,23 @@ class TestHost(TestBaseClass):
         """Run monitor with logging enabled including the timestamps"""
         # run monitor on empty input
         out, err = self.run_monitor_async()
-        monitor_watchdog = threading.Timer(60, on_timeout, [self.proc])
-        monitor_watchdog.start()
-        self.send_control('TL')  # toggle log file
         self.send_control('TI')  # toggle timestamps
-        time.sleep(1)  # wait for commands to apply
-        clientsocket, _ = self.serversocket.accept()
+        self.send_control('TL')  # toggle log file
+        # commands are handled in order, so both are applied once logging is reported
+        assert self.wait_for_output(err, 'Logging is enabled into file')
+        assert self.clientsocket is not None
         input_file = 'in1.txt'
         try:
             with open(os.path.join(IN_DIR, input_file), 'rb') as f:
                 for chunk in iter(lambda: f.read(1024), b''):
-                    clientsocket.sendall(chunk)
-            time.sleep(1)
+                    self.clientsocket.sendall(chunk)
+            assert self.wait_for_output(out, 'info6 without timestamp')  # last line of the input
             self.send_control('TL')  # close log file to make sure that output is written
-            time.sleep(1)  # wait for command to apply
+            assert self.wait_for_output(err, 'Logging is disabled and file')
             assert self.close_monitor_async() == 0
-            monitor_watchdog.cancel()
         finally:
-            clientsocket.close()
+            self.clientsocket.close()
+            self.clientsocket = None
         with open(err) as f_err:
             stderr = f_err.read()
         with open(out) as f_out:
@@ -460,7 +551,7 @@ class TestBinaryLogging(TestBaseClass):
 
     def test_binary_logging(self):
         args = [self.ELF_PATH, os.path.join(IN_DIR, 'bootloader.elf')]
-        out, err = self.run_monitor(args, 'binlog', timeout=10)
+        out, err = self.run_monitor(args, 'binlog', timeout=30)
         with open(err) as f_err:
             stderr = f_err.read()
             assert f"Expect pattern '{STOP_MARKER}' matched" in stderr
@@ -615,6 +706,17 @@ class TestConfig(TestBaseClass):
             f.writelines(config)
         return filename
 
+    def assert_reset_sequence(self, err: str, msg: str, sequence: List[str]) -> None:
+        """Wait for the logged reset sequence, close the monitor and check that the sequence follows msg."""
+        expected = '\n'.join(sequence)
+        assert self.wait_for_output(err, expected)
+        assert self.close_monitor_async() == 0
+        with open(err) as f_err:
+            stderr = f_err.read()
+        assert msg in stderr
+        # remove everything before message about using custom config to remove starting reset sequence
+        assert expected in stderr.split(msg)[1]
+
     @pytest.mark.parametrize('filename', ['esp-idf-monitor.cfg', 'config.cfg', 'tox.ini'])
     def test_custom_config(self, filename: str):
         """Run monitor with custom and validate it is NOT case-sensitive"""
@@ -627,7 +729,7 @@ class TestConfig(TestBaseClass):
             self.send_control('TK')
             # make sure that command will be accepted before closing the monitor
             # chip input has priority and closing command is written to the chip input queue
-            time.sleep(0.5)
+            assert self.wait_for_output(err, 'Logging is enabled into file')
             # show help command
             self.send_control('TH')
             assert self.close_monitor_async() == 0
@@ -658,7 +760,8 @@ class TestConfig(TestBaseClass):
         _, err = self.run_monitor_async()
         self.send_control('TH')  # show help command
         self.send_control('A')  # make app-flash (missing menu key)
-        time.sleep(1)  # wait for make to run
+        assert self.wait_for_output(err, 'Running make app-flash...')
+        assert self.wait_for_output(err, 'Press any other key to resume monitor')
         assert self.close_monitor_async() == 0
 
         with open(err) as f_err:
@@ -690,19 +793,9 @@ class TestConfig(TestBaseClass):
         # create custom config with custom reset sequence
         self.create_config({'custom_reset_sequence': 'R1|W0.1|R0|D1'}, section='esptool')
         # run monitor
-        _, err = self.run_monitor_async(args=['--no-reset'])
+        _, err = self.run_monitor_async()
         # reset into bootloader
         self.send_control('TP')
-        # wait for command to apply
-        time.sleep(0.5)
-        assert self.close_monitor_async() == 0
-
-        with open(err) as f_err:
-            stderr = f_err.read()
-        msg = f'Using custom reset sequence from esptool config file: {os.path.join(os.getcwd(), "config.cfg")}'
-        assert msg in stderr
-        # remove everything before message about using custom config to remove starting reset sequence
-        log_seq = stderr.split(msg)[1]
         # Check pyserial's log of the custom reset sequence. The esp-pylib
         # serial-reset primitives pass ``True``/``False`` to ``setRTS`` /
         # ``setDTR`` (matching the type annotations); the legacy esp-idf-monitor
@@ -716,7 +809,8 @@ class TestConfig(TestBaseClass):
             'INFO:pySerial.socket:ignored _update_dtr_state(False)',  # expected workaround for windows RTS setting
             'INFO:pySerial.socket:ignored _update_dtr_state(True)',  # D1
         ]
-        assert '\n'.join(my_seq) in log_seq
+        msg = f'Using custom reset sequence from esptool config file: {os.path.join(os.getcwd(), "config.cfg")}'
+        self.assert_reset_sequence(err, msg, my_seq)
 
     def test_custom_sequence_precedence(self):
         """Define custom reset sequence in esptool and esp-idf-monitor sections and
@@ -726,19 +820,9 @@ class TestConfig(TestBaseClass):
         with open(filename, 'a') as f:
             f.writelines(['[esptool]\n', 'custom_reset_sequence = R1|D1\n'])
         # run monitor
-        _, err = self.run_monitor_async(args=['--no-reset'])
+        _, err = self.run_monitor_async()
         # reset into bootloader
         self.send_control('TP')
-        # wait for command to apply
-        time.sleep(0.5)
-        assert self.close_monitor_async() == 0
-
-        with open(err) as f_err:
-            stderr = f_err.read()
-        msg = f'Using custom reset sequence from config file: {os.path.join(os.getcwd(), "config.cfg")}'
-        assert msg in stderr
-        # remove everything before message about using custom config to remove starting reset sequence
-        log_seq = stderr.split(msg)[1]
         # See ``test_esptool_sequence`` for the rationale on ``True``/``False`` here
         my_seq = [
             'INFO:pySerial.socket:ignored _update_rts_state(True)',  # R1
@@ -747,7 +831,8 @@ class TestConfig(TestBaseClass):
             'INFO:pySerial.socket:ignored _update_dtr_state(False)',  # expected workaround for windows RTS setting
             'INFO:pySerial.socket:ignored _update_dtr_state(True)',  # D1
         ]
-        assert '\n'.join(my_seq) in log_seq
+        msg = f'Using custom reset sequence from config file: {os.path.join(os.getcwd(), "config.cfg")}'
+        self.assert_reset_sequence(err, msg, my_seq)
 
     def test_invalid_custom_sequence(self):
         """Use invalid custom reset sequence"""
@@ -757,8 +842,7 @@ class TestConfig(TestBaseClass):
         _, err = self.run_monitor_async()
         # reset into bootloader
         self.send_control('TP')
-        # wait for command to apply
-        time.sleep(0.5)
+        assert self.wait_for_output(err, 'Invalid "custom_reset_sequence" option format:')
         assert self.close_monitor_async() == 0
 
         with open(err) as f_err:
@@ -778,18 +862,9 @@ class TestConfig(TestBaseClass):
         # create custom config with custom hard reset sequence
         self.create_config({'custom_hard_reset_sequence': 'R1|W0.1|R0'})
         # run monitor
-        _, err = self.run_monitor_async(args=['--no-reset'])
+        _, err = self.run_monitor_async()
         # hard reset chip
         self.send_control('TR')
-        # wait for command to apply
-        time.sleep(0.5)
-        assert self.close_monitor_async() == 0
-        with open(err) as f_err:
-            stderr = f_err.read()
-        msg = f'Using custom hard reset sequence from config file: {os.path.join(os.getcwd(), "config.cfg")}'
-        assert msg in stderr
-        # remove everything before message about using custom config to remove starting reset sequence
-        log_seq = stderr.split(msg)[1]
         # See ``test_esptool_sequence`` for the rationale on ``True``/``False``
         # here vs. the historical ``1``/``0``.
         my_seq = [
@@ -797,7 +872,8 @@ class TestConfig(TestBaseClass):
             'INFO:pySerial.socket:ignored _update_dtr_state(False)',  # expected workaround for windows RTS setting
             'INFO:pySerial.socket:ignored _update_rts_state(False)',  # R0
         ]
-        assert '\n'.join(my_seq) in log_seq
+        msg = f'Using custom hard reset sequence from config file: {os.path.join(os.getcwd(), "config.cfg")}'
+        self.assert_reset_sequence(err, msg, my_seq)
 
 
 class TestCStyleConversion(TestBaseClass):
@@ -1054,10 +1130,10 @@ class TestLogger:
 
     def test_timestamps_unaffected_by_monitor_messages(self):
         """Monitor stderr lines must not break timestamp prefixing on serial output."""
-        serial_output = []  # type: List[bytes]
+        serial_output: List[bytes] = []
 
         class _CapturingConsole:
-            def write_bytes(self, data):  # type: (bytes) -> None
+            def write_bytes(self, data: bytes) -> None:
                 serial_output.append(data)
 
         logger = Logger(
@@ -1542,48 +1618,18 @@ class TestCommandMode(TestBaseClass):
     is connected to.
     """
 
-    def accept(self, timeout: int = 20) -> socket.socket:
-        """Accept the monitor's serial-port connection on the server socket."""
-        self.serversocket.settimeout(timeout)
-        # annotate the local: self.serversocket is untyped (Any) in the base class
-        clientsocket: socket.socket = self.serversocket.accept()[0]
-        return clientsocket
+    def accept(self) -> socket.socket:
+        """Return the connection accepted during deterministic monitor startup."""
+        assert self.clientsocket is not None
+        return self.clientsocket
 
-    def wait_exit(self, timeout: int = 15) -> Optional[int]:
+    def wait_exit(self, timeout: int = 15) -> int:
         """Wait for the monitor process to exit, failing the test on timeout."""
-        watchdog = threading.Timer(timeout, on_timeout, [self.proc])
-        watchdog.start()
-        try:
-            while True:
-                ret = self.proc.poll()
-                if ret is not None:
-                    return ret
-                time.sleep(0.2)
-        finally:
-            watchdog.cancel()
-
-    def wait_for_output(self, path: str, needle: str, timeout: int = 10) -> bool:
-        """Poll the output file until it contains needle or the timeout elapses."""
-        deadline = time.monotonic() + timeout
-        while time.monotonic() < deadline:
-            with open(path) as f:
-                if needle in f.read():
-                    return True
-            time.sleep(0.2)
-        return False
-
-    def teardown_method(self):
-        """Make sure the monitor process is not left running."""
-        proc = getattr(self, 'proc', None)
-        try:
-            if proc is not None and proc.poll() is None:
-                proc.kill()
-        except Exception:
-            pass
+        return self.wait_for_exit(timeout, self.err)
 
     def test_command_mode_detected_and_eof_exits(self):
         """Non-TTY stdin selects command mode; the script runs and EOF exits."""
-        out, err = self.run_monitor_command_mode()
+        _, err = self.run_monitor_command_mode()
         clientsocket = self.accept()  # wait for the monitor to connect its serial port
         try:
             assert self.proc.stdin is not None
@@ -1605,14 +1651,14 @@ class TestCommandMode(TestBaseClass):
         'expect' as the last command turns EOF into exit-on-pattern, and the
         '$' anchor matches despite the CRLF line ending from the device.
         """
-        out, err = self.run_monitor_command_mode()
+        _, err = self.run_monitor_command_mode()
         clientsocket = self.accept()
         try:
             assert self.proc.stdin is not None
             self.proc.stdin.write(b'sleep 0.2\nexpect READY$\n')
             self.proc.stdin.close()
-            # give the reader time to consume 'sleep' and arm 'expect'
-            time.sleep(1)
+            # let the reader consume 'sleep' and reach 'expect'
+            assert self.wait_for_output(err, "Command: 'expect READY$'")
             clientsocket.sendall(b'I (100) app: still booting\r\n')
             clientsocket.sendall(b'I (200) app: READY\r\n')
             ret = self.wait_exit()
@@ -1625,7 +1671,7 @@ class TestCommandMode(TestBaseClass):
 
     def test_send_writes_to_the_device(self):
         """'send <text>' writes the text (followed by EOL) to the serial device."""
-        out, err = self.run_monitor_command_mode()
+        self.run_monitor_command_mode()
         clientsocket = self.accept()
         clientsocket.settimeout(15)
         received = b''
@@ -1668,7 +1714,7 @@ class TestCommandMode(TestBaseClass):
 
     def test_expect_timeout_aborts_script(self):
         """'expect --timeout' gives up after the deadline and aborts the rest of the script."""
-        out, err = self.run_monitor_command_mode()
+        _, err = self.run_monitor_command_mode()
         clientsocket = self.accept()
         try:
             assert self.proc.stdin is not None
