@@ -46,6 +46,7 @@ from esp_pylib.excepthook import install_exception_reporting
 from esp_pylib.logger import log
 from esp_pylib.rom import get_rom_elf_path
 from esp_pylib.serial_ports import detect_port as _pylib_detect_port
+from esp_pylib.serial_ports import pick_port as _pylib_pick_port
 from serial.tools import miniterm
 
 from esp_idf_monitor import __version__
@@ -455,10 +456,10 @@ class LinuxMonitor(Monitor):
         return  # fake function for linux target
 
 
-def detect_port() -> Union[str, NoReturn]:
-    """Detect connected ports and return the highest-priority one."""
+def detect_port(pick: bool = False) -> Union[str, NoReturn]:
+    """Detect connected ports and return the highest-priority one (or let the user pick)."""
     try:
-        port = _pylib_detect_port()
+        port = _pylib_pick_port() if pick else _pylib_detect_port()
     except NoSerialPortFoundError:
         log.die('No serial ports detected.')
 
@@ -469,6 +470,7 @@ def detect_port() -> Union[str, NoReturn]:
 def _run_monitor(
     *,
     port: Optional[str],
+    pick: bool,
     no_reset: bool,
     disable_address_decoding: bool,
     baud: int,
@@ -557,7 +559,7 @@ def _run_monitor(
 
             # If no port was given, detect connected ports and use one of them.
             if active_port is None:
-                active_port = detect_port()
+                active_port = detect_port(pick)
             # GDB uses CreateFile to open COM port, which requires the COM name
             # to be r'\\.\COMx' if the COM number is larger than 10.
             if os.name == 'nt' and active_port.startswith('COM'):

@@ -41,6 +41,14 @@ def _default_port_help() -> str:
     help=_default_port_help(),
 )
 @click.option(
+    '--pick',
+    is_flag=True,
+    envvar='ESP_IDF_MONITOR_PICK',
+    default=False,
+    help='If --port is not set, choose the port from a list of connected ports instead of using the '
+    'first one found. Ignored when not running in a terminal.',
+)
+@click.option(
     '--no-reset',
     is_flag=True,
     envvar='ESP_IDF_MONITOR_NO_RESET',
