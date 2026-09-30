@@ -139,7 +139,6 @@ workflow:
   extends:
     - .install_target_test
   tags:
-    - generic
     - esp32
   artifacts:
     paths:
