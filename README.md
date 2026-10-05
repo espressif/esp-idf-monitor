@@ -300,30 +300,7 @@ This intentional limitation ensures that only specific, safe espefuse operations
 
 ## Contributing
 
-### Code Style & Static Analysis
-
-Please follow these coding standards when writing code for `esp-idf-monitor`:
-
-#### Pre-commit Checks
-
-[pre-commit](https://pre-commit.com/) is a framework for managing pre-commit hooks. These hooks help to identify simple issues before committing code for review.
-
-To use the tool, first install `pre-commit`. Then enable the `pre-commit` and `commit-msg` git hooks:
-
-```sh
-python -m pip install pre-commit
-pre-commit install -t pre-commit -t commit-msg
-```
-
-On the first commit `pre-commit` will install the hooks, subsequent checks will be significantly faster. If an error is found an appropriate error message will be displayed.
-
-##### Codespell Check
-
-This repository utilizes an automatic [spell checker](https://github.com/codespell-project/codespell) integrated into the pre-commit process. If any spelling issues are detected, the recommended corrections will be applied automatically to the file, ready for commit. In the event of false positives, you can adjust the configuration in the `pyproject.toml` file under the `[tool.codespell]` section. To exclude files from the spell check, utilize the `skip` keyword followed by comma-separated paths to the files (wildcards are supported). Additionally, to exclude specific words from the spell check, employ the `ignore-words-list` keyword followed by comma-separated words to be skipped.
-
-#### Conventional Commits
-
-`esp-idf-monitor` complies with the [Conventional Commits standard](https://www.conventionalcommits.org/en/v1.0.0/#specification). Every commit message is checked with [Conventional Precommit Linter](https://github.com/espressif/conventional-precommit-linter), ensuring it adheres to the standard.
+Open an [issue](https://github.com/espressif/esp-idf-monitor/issues) to discuss a change before you open a pull request. The [contribution guide](https://github.com/espressif/esp-idf-monitor/blob/master/CONTRIBUTING.md) lists the checks that must pass and explains how to write and check commit messages.
 
 ## License
 
