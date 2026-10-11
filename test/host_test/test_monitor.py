@@ -1335,6 +1335,7 @@ class TestTagKeyEncoding:
         monitor = object.__new__(Monitor)
         monitor.cmd_queue = queue.Queue()
         monitor.event_queue = queue.Queue()
+        monitor._flush_deadline = None
         monitor.serial_write = written.append  # type: ignore[method-assign]
 
         data = b'\xe3'.decode('utf-8', 'surrogateescape')
