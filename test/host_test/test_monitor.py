@@ -57,7 +57,7 @@ if os.name != 'nt':
 HOST = '127.0.0.1'
 
 IN_DIR = os.path.join(os.path.abspath(os.path.dirname(__file__)), 'inputs')  # input files for tests
-# unique marker fed over the serial socket to stop the monitor in command mode (matched by 'expect')
+# unique marker fed over the serial socket to stop the monitor in Command-Stream Mode (matched by 'expect')
 STOP_MARKER = 'ESP_IDF_MONITOR_STOP'
 
 
@@ -204,21 +204,21 @@ class TestBaseClass:
         self._wait_monitor_ready(custom_port)
         return self.out, self.err
 
-    def run_monitor_command_mode(
+    def run_monitor_command_stream_mode(
         self,
         args: Optional[List[str]] = None,
         custom_port: str = '',
         stdin: int = subprocess.PIPE,
         no_reset: bool = True,
     ) -> Tuple[str, str]:
-        """Run the monitor in non-interactive command mode.
+        """Run the monitor in Command-Stream Mode.
 
         stdin is not a TTY (a pipe or /dev/null), so the monitor reads
         line-based commands from it (CommandReader). The monitor keeps running
         after this returns. Returns the stdout and stderr filenames.
         """
         cmd = self._monitor_cmd(args, custom_port, no_reset)
-        # no PTY here: command mode is exactly the "stdin is not a TTY" path
+        # no PTY here: Command-Stream Mode is exactly the "stdin is not a TTY" path
         self.master_fd, self.slave_fd = None, None
         output_file = os.path.join(out_dir, filename_fix(self.test_name))
         with open(f'{output_file}.out', 'w') as o_f, open(f'{output_file}.err', 'w') as e_f:
@@ -241,13 +241,13 @@ class TestBaseClass:
     ) -> Tuple[str, str]:
         """Run IDF Monitor over an input file with a timeout.
 
-        The monitor runs in non-interactive command mode. input_file is streamed
+        The monitor runs in Command-Stream Mode. input_file is streamed
         over the serial socket, followed by a unique marker line; the 'expect'
         command waits for that marker, so the monitor exits only after all the
         input has been decoded and printed. The marker line is stripped from the
         captured stdout. Returns the stdout and stderr filenames.
         """
-        out, err = self.run_monitor_command_mode(args, custom_port=custom_port, no_reset=no_reset)
+        out, err = self.run_monitor_command_stream_mode(args, custom_port=custom_port, no_reset=no_reset)
 
         # make sure that monitor is running, else we will end in an infinite loop
         if self.proc.poll() is not None:
@@ -1228,7 +1228,7 @@ class TestLogger:
         monkeypatch.setattr(sys, 'stderr', real_stderr)
         monkeypatch.setattr(idf_monitor.miniterm, 'Console', ReplacingConsole)
 
-        console = idf_monitor._create_console(non_interactive=False)
+        console = idf_monitor._create_console(command_stream_mode=False)
 
         assert isinstance(console, ReplacingConsole)
         assert sys.stderr is real_stderr
@@ -1348,7 +1348,7 @@ class TestTagKeyEncoding:
 
 
 class TestCommandReader:
-    """Unit tests for the non-interactive command reader (CommandReader).
+    """Unit tests for the Command-Stream Mode reader (CommandReader).
 
     The reader is exercised directly through _handle_line()/observe_line()
     without spawning the monitor, so these are fast and run on every platform.
@@ -1609,11 +1609,11 @@ class TestCommandReader:
 
 
 @pytest.mark.skipif(os.name == 'nt', reason='Linux/MacOS only')
-class TestCommandMode(TestBaseClass):
-    """End-to-end tests for the non-interactive command mode.
+class TestCommandStreamMode(TestBaseClass):
+    """End-to-end tests for Command-Stream Mode.
 
     stdin is a pipe or /dev/null (never a TTY), so the monitor switches to
-    command mode and reads line-based commands from stdin (CommandReader). The
+    Command-Stream Mode and reads line-based commands from stdin (CommandReader). The
     TCP server socket from the get_port fixture acts as the device the monitor
     is connected to.
     """
@@ -1628,8 +1628,8 @@ class TestCommandMode(TestBaseClass):
         return self.wait_for_exit(timeout, self.err)
 
     def test_command_mode_detected_and_eof_exits(self):
-        """Non-TTY stdin selects command mode; the script runs and EOF exits."""
-        _, err = self.run_monitor_command_mode()
+        """Non-TTY stdin selects Command-Stream Mode; the script runs and EOF exits."""
+        _, err = self.run_monitor_command_stream_mode()
         clientsocket = self.accept()  # wait for the monitor to connect its serial port
         try:
             assert self.proc.stdin is not None
@@ -1641,7 +1641,7 @@ class TestCommandMode(TestBaseClass):
         assert ret == 0
         with open(err) as f_err:
             stderr = f_err.read()
-        assert 'running in non-interactive mode' in stderr
+        assert 'running in Command-Stream Mode' in stderr
         assert "--- Command: 'output'" in stderr
         assert 'EOF received on standard input, exiting' in stderr
 
@@ -1651,7 +1651,7 @@ class TestCommandMode(TestBaseClass):
         'expect' as the last command turns EOF into exit-on-pattern, and the
         '$' anchor matches despite the CRLF line ending from the device.
         """
-        _, err = self.run_monitor_command_mode()
+        _, err = self.run_monitor_command_stream_mode()
         clientsocket = self.accept()
         try:
             assert self.proc.stdin is not None
@@ -1671,7 +1671,7 @@ class TestCommandMode(TestBaseClass):
 
     def test_send_writes_to_the_device(self):
         """'send <text>' writes the text (followed by EOL) to the serial device."""
-        self.run_monitor_command_mode()
+        self.run_monitor_command_stream_mode()
         clientsocket = self.accept()
         clientsocket.settimeout(15)
         received = b''
@@ -1695,7 +1695,7 @@ class TestCommandMode(TestBaseClass):
 
     def test_watch_only_mode_exits_on_sigterm(self):
         """Empty stdin selects watch-only mode; SIGTERM shuts the monitor down cleanly."""
-        out, err = self.run_monitor_command_mode(stdin=subprocess.DEVNULL)
+        out, err = self.run_monitor_command_stream_mode(stdin=subprocess.DEVNULL)
         clientsocket = self.accept()
         printed = False
         try:
@@ -1714,7 +1714,7 @@ class TestCommandMode(TestBaseClass):
 
     def test_expect_timeout_aborts_script(self):
         """'expect --timeout' gives up after the deadline and aborts the rest of the script."""
-        _, err = self.run_monitor_command_mode()
+        _, err = self.run_monitor_command_stream_mode()
         clientsocket = self.accept()
         try:
             assert self.proc.stdin is not None

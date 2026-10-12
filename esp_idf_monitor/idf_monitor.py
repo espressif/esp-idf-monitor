@@ -96,11 +96,11 @@ from esp_idf_monitor.config import Config
 key_description = miniterm.key_description
 
 
-def _create_console(non_interactive: bool):
+def _create_console(command_stream_mode: bool):
     """Create miniterm's console without allowing it to replace stderr."""
     real_stderr = sys.stderr
     try:
-        return miniterm.ConsoleBase() if non_interactive else miniterm.Console()
+        return miniterm.ConsoleBase() if command_stream_mode else miniterm.Console()
     finally:
         # pyserial's Windows Console replaces stderr with a UTF-8 writer that
         # has no isatty(), which makes Rich disable colors for monitor messages.
@@ -138,15 +138,22 @@ class Monitor:
         force_color=False,  # type: bool
         disable_auto_color=False,  # type: bool
         rom_elf_file=None,  # type: Optional[str]
-        non_interactive=False,  # type: bool
+        command_stream_mode=False,  # type: bool
+        non_interactive=None,  # type: Optional[bool]
     ):
+        if non_interactive is not None:
+            log.warn(
+                'The non_interactive argument of Monitor is deprecated and will be removed in a future release, '
+                'use command_stream_mode instead.'
+            )
+            command_stream_mode = command_stream_mode or non_interactive
         self.event_queue = queue.Queue()  # type: queue.Queue
         self.cmd_queue = queue.Queue()  # type: queue.Queue
-        self.non_interactive = non_interactive
+        self.command_stream_mode = command_stream_mode
         # ConsoleBase writes to stdout but never touches the TTY, so it is safe
         # to use when stdin is not attached to a terminal (pipe, file, CI).
         # The Console subclass requires a real TTY on construction.
-        self.console = _create_console(non_interactive)
+        self.console = _create_console(command_stream_mode)
         # Chip/serial ANSI (stdout via miniterm) still needs the Windows converter.
         # Monitor messages go through Rich on the real sys.stderr — do not wrap it,
         # or EspLog.err/warn lose TTY detection (no color, hard-wrap at 80 cols).
@@ -207,7 +214,7 @@ class Monitor:
             self.gdb_helper = None
 
         self.console_parser = ConsoleParser(eol)
-        if non_interactive:
+        if command_stream_mode:
             # Without a TTY on stdin, keys cannot be read; read line-based
             # commands from stdin instead, so the monitor can be scripted.
             command_reader = CommandReader(self.event_queue, self.console_parser)
@@ -245,7 +252,7 @@ class Monitor:
     def __enter__(self) -> None:
         """Use 'with self' to temporarily disable monitoring behaviour"""
         self.serial_reader.stop()
-        if not self.non_interactive:
+        if not self.command_stream_mode:
             # The CommandReader is left running: it cannot be restarted while
             # it is blocked in readline() and it does not touch the TTY, so
             # there is no need to suspend it. Commands read meanwhile are
@@ -279,7 +286,7 @@ class Monitor:
                 self.event_queue,
                 self.cmd_queue,
                 self.logger,
-                non_interactive=self.non_interactive,
+                command_stream_mode=self.command_stream_mode,
                 env_extra=env_extra,
             )
 
@@ -288,7 +295,7 @@ class Monitor:
         self.serial_reader.start()
 
     def main_loop(self) -> None:
-        if self.non_interactive:
+        if self.command_stream_mode:
             # SIGTERM is how Docker/CI stop processes; reuse the Ctrl+C
             # (KeyboardInterrupt) clean-shutdown path so the log file is
             # flushed and closed. The default action would kill the process
@@ -304,7 +311,7 @@ class Monitor:
                 try:
                     self._main_loop()
                 except KeyboardInterrupt:
-                    if self.non_interactive:
+                    if self.command_stream_mode:
                         # there is no exit key without a TTY, Ctrl+C exits
                         break
                     log.note(
@@ -394,7 +401,7 @@ class Monitor:
 class SerialMonitor(Monitor):
     def __exit__(self, exc_type, exc_val, exc_tb) -> None:  # type: ignore
         """Use 'with self' to temporarily disable monitoring behaviour"""
-        if not self.non_interactive:
+        if not self.command_stream_mode:
             # the CommandReader was not stopped in __enter__
             self.console_reader.start()
         if self.elf_exists:
@@ -427,12 +434,12 @@ class SerialMonitor(Monitor):
 
     def check_gdb_stub_and_run(self, line: bytes) -> None:  # type: ignore # The base class one is a None value
         if self.gdb_helper and self.gdb_helper.check_gdb_stub_trigger(line):
-            if self.non_interactive:
+            if self.command_stream_mode:
                 # gdb would read from the same stdin as the CommandReader and
                 # there is no terminal for an interactive session anyway
                 if not self._gdb_stub_warned:
                     log.warn(
-                        'GDB stub detected, but an interactive GDB session cannot be started in non-interactive mode'
+                        'GDB stub detected, but an interactive GDB session cannot be started in Command-Stream Mode'
                     )
                     self._gdb_stub_warned = True
                 return
@@ -453,7 +460,7 @@ class SerialMonitor(Monitor):
 class LinuxMonitor(Monitor):
     def __exit__(self, exc_type, exc_val, exc_tb) -> None:  # type: ignore
         """Use 'with self' to temporarily disable monitoring behaviour"""
-        if not self.non_interactive:
+        if not self.command_stream_mode:
             # the CommandReader was not stopped in __enter__
             self.console_reader.start()
         self.serial_reader.start()
@@ -513,9 +520,9 @@ def _run_monitor(
     install_monitor_log(force_color=force_color)
 
     # Without a TTY on stdin (pipe, file, CI) interactive key reading is not
-    # possible; switch to the non-interactive mode, where line-based commands
-    # are read from stdin instead (see CommandReader).
-    non_interactive = not sys.stdin.isatty()
+    # possible; switch to Command-Stream Mode, where line-based commands are
+    # read from stdin instead (see CommandReader).
+    command_stream_mode = not sys.stdin.isatty()
 
     # Default EOL: LF for Linux targets, CR otherwise. Matches the
     # historical behaviour the existing host tests pin.
@@ -625,16 +632,16 @@ def _run_monitor(
             force_color,
             disable_auto_color,
             resolved_rom_elf,
-            non_interactive,
+            command_stream_mode,
         )
 
         if save_log:
             monitor.logger.start_logging()
 
-        if non_interactive:
+        if command_stream_mode:
             extras = ['send <text>', 'sleep <seconds>', 'expect [--timeout <seconds>] <regex>', 'exit']
             log.print(
-                'Standard input is not a TTY, running in non-interactive mode. Reading commands '
+                'Standard input is not a TTY, running in Command-Stream Mode. Reading commands '
                 f'from stdin: {", ".join(list(CommandReader.COMMANDS) + extras)} '
                 "| Quit: 'exit' command, EOF or Ctrl+C",
                 style='yellow',
@@ -655,7 +662,7 @@ def _run_monitor(
             log.print(f'Print filter: "{print_filter}"{msg}', style='yellow')
         Config().load_configuration(verbose=True)
         monitor.main_loop()
-        # In non-interactive mode the console reader is the CommandReader which
+        # In Command-Stream Mode the console reader is the CommandReader, which
         # writes its exit code before queuing the stop the main loop has just
         # processed, so it is up to date here.
         if isinstance(monitor.console_reader, CommandReader):
