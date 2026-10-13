@@ -7,7 +7,6 @@ name = 'esp-idf-monitor'
 authors = [{name = 'Espressif Systems'}]
 description = 'Serial monitor for esp-idf'
 keywords = ['espressif', 'embedded', 'monitor', 'serial']
-license = { text = 'Apache-2.0' }
 classifiers = [
     'Development Status :: 5 - Production/Stable',
     'Intended Audience :: Developers',
@@ -27,7 +26,7 @@ classifiers = [
     'Operating System :: MacOS :: MacOS X',
 ]
 requires-python = '>=3.7'
-dynamic = ['version']
+dynamic = ['version', 'license']
 dependencies = [
     'pyserial>=3.3',
     'esp-coredump~=1.2',
