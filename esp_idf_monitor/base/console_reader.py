@@ -35,9 +35,20 @@ class ConsoleReader(StoppableThread):
             # results in Critical Error in Windows: https://github.com/espressif/esp-idf/issues/12162
             # Note: UTF-8 characters seem to work even without this setting
             import ctypes
+            from ctypes import wintypes
 
             ctypes.windll.kernel32.SetConsoleOutputCP(console._saved_ocp)
             ctypes.windll.kernel32.SetConsoleCP(console._saved_icp)
+
+            # Enable ENABLE_VIRTUAL_TERMINAL_INPUT (0x0200) to allow raw escape sequences (like CPR)
+            # to pass to stdin without being mangled by ConPTY/conhost
+            self._stdin_handle = ctypes.windll.kernel32.GetStdHandle(-10)  # -10 = STD_INPUT_HANDLE
+            self._saved_in_mode = wintypes.DWORD()
+            if ctypes.windll.kernel32.GetConsoleMode(self._stdin_handle, ctypes.byref(self._saved_in_mode)):
+                ENABLE_VIRTUAL_TERMINAL_INPUT = 0x0200
+                ctypes.windll.kernel32.SetConsoleMode(
+                    self._stdin_handle, self._saved_in_mode.value | ENABLE_VIRTUAL_TERMINAL_INPUT
+                )
 
     def run(self):
         # type: () -> None
@@ -63,7 +74,7 @@ class ConsoleReader(StoppableThread):
                         import msvcrt
 
                         while not msvcrt.kbhit() and self.alive:  # type: ignore
-                            time.sleep(0.1)
+                            time.sleep(0.01)
                         if not self.alive:
                             break
                     c = self.console.getkey()
@@ -96,4 +107,8 @@ class ConsoleReader(StoppableThread):
                             self.event_queue.put(ret)
 
         finally:
+            if sys.platform == 'win32' and hasattr(self, '_saved_in_mode'):
+                import ctypes
+
+                ctypes.windll.kernel32.SetConsoleMode(self._stdin_handle, self._saved_in_mode)
             self.console.cleanup()
