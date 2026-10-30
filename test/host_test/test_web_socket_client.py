@@ -25,6 +25,7 @@ import sys
 from unittest.mock import MagicMock
 
 import pytest
+from esp_pylib.errors import FatalError
 
 from esp_idf_monitor.base.monitor_log import install_monitor_log
 
@@ -290,12 +291,9 @@ class TestPylibBackend:
 class TestLegacyBackend:
     @pytest.mark.usefixtures('restore_module')
     def test_init_raises_when_websocket_missing(self):
-        """Both backends raise something a caller can catch as ``RuntimeError``:
-        the legacy backend raises plain ``RuntimeError`` directly, and the pylib
-        backend raises ``esp_pylib.errors.FatalError`` (itself a ``RuntimeError``
-        subclass). So ``except RuntimeError`` works regardless of backend."""
+        """Both backends use FatalError for expected operational failures."""
         wsc = _reload_module(monkeypatch_pylib=None, monkeypatch_websocket=None)
-        with pytest.raises(RuntimeError, match='websocket_client'):
+        with pytest.raises(FatalError, match='websocket_client'):
             wsc._LegacyBackend('ws://localhost:9')
 
     @pytest.mark.usefixtures('restore_module')

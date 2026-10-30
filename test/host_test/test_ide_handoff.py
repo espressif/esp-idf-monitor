@@ -19,6 +19,7 @@ from unittest.mock import patch
 
 import pytest
 import serial
+from esp_pylib.errors import FatalError
 
 import esp_idf_monitor.base.web_socket_client as wsc
 from esp_idf_monitor.base.coredump import COREDUMP_DECODE_INFO
@@ -237,6 +238,20 @@ class TestGdbStubIdeHandoff:
 
         monitor.serial_reader.start.assert_not_called()
         assert len(connections) == 1
+
+    def test_websocket_failure_after_send_does_not_reopen_port(self, tmp_path):
+        ws = MagicMock()
+        order: list[str] = []
+        monitor = _make_monitor(tmp_path, websocket_client=ws)
+        monitor.serial_reader.stop.side_effect = lambda: order.append('stop')
+        monitor.serial_reader.start.side_effect = lambda: order.append('start')
+        ws.roundtrip.side_effect = FatalError('Lost WebSocket connection while waiting for event')
+
+        with pytest.raises(FatalError, match='Lost WebSocket connection'):
+            monitor.check_gdb_stub_and_run(GDB_STUB_PACKET)
+
+        monitor.serial_reader.start.assert_not_called()
+        assert order == ['stop']
 
     def test_without_ws_runs_cli_gdb_when_interactive(self, tmp_path):
         monitor = _make_monitor(tmp_path, websocket_client=None, command_stream_mode=False)

@@ -33,6 +33,7 @@ import time
 from typing import Any
 from typing import Iterable
 
+from esp_pylib.errors import FatalError
 from esp_pylib.logger import log
 
 # Imported as a module so tests can swap ``esp_pylib.ws`` in ``sys.modules``
@@ -123,11 +124,6 @@ class _PylibBackend:
         # Materialise once so we can both validate length and dispatch.
         expectations = list(expect_iterable)
         assert _pylib_ws is not None
-        # Late import: in failure cases we still want a clear "esp-pylib
-        # not installed" error from ``_pylib_available()`` before this
-        # code path runs.
-        from esp_pylib.errors import FatalError
-
         if len(expectations) != 1 or expectations[0][0] != 'event':
             raise FatalError(f'Unsupported WebSocket wait expectation: {expectations!r}')
         event_name = expectations[0][1]
@@ -144,8 +140,8 @@ class _LegacyBackend:
     """Fallback backend using the ``websocket-client`` package.
 
     Kept only for Python 3.7 (and any environment where esp-pylib's
-    ``[ide]`` extra didn't install). The behaviour is the same as the
-    pre-migration implementation, just lifted into its own class.
+    ``[ide]`` extra didn't install). Like the pylib backend, it raises
+    `esp_pylib.errors.FatalError` when it cannot connect, send, or receive.
     """
 
     RETRIES = 3
@@ -161,7 +157,7 @@ class _LegacyBackend:
         # surfacing a misleading "Cannot connect" after three retry
         # attempts against a no-op stub.
         if websocket is None:
-            raise RuntimeError('Please install the websocket_client package for IDE integration!')
+            raise FatalError('Please install the websocket_client package for IDE integration!')
         self.url = url
         self._connect()
 
@@ -175,7 +171,7 @@ class _LegacyBackend:
                 log.err(f'WebSocket connection error: {e}')
             time.sleep(self.CONNECTION_RETRY_DELAY)
         else:
-            raise RuntimeError('Cannot connect to WebSocket server')
+            raise FatalError('Cannot connect to WebSocket server')
 
     def close(self) -> None:
         try:
@@ -194,7 +190,7 @@ class _LegacyBackend:
             except Exception as e:
                 log.err(f'WebSocket send error: {e}')
                 self._connect()
-        raise RuntimeError('Cannot send to WebSocket server')
+        raise FatalError('Cannot send to WebSocket server')
 
     def wait(self, expect_iterable: Iterable[tuple[str, Any]]) -> Any:
         expectations = list(expect_iterable)
@@ -210,7 +206,7 @@ class _LegacyBackend:
                 log.note(f'WebSocket received: {obj}')
                 return obj
             log.err(f'WebSocket expected: {dict(expectations)}, received: {obj}')
-        raise RuntimeError('Cannot receive from WebSocket server')
+        raise FatalError('Cannot receive from WebSocket server')
 
 
 class WebSocketClient:
@@ -244,9 +240,6 @@ class WebSocketClient:
         if _pylib_available():
             self._impl = _PylibBackend(url)
         else:
-            # Surfacing the websocket-client requirement up front matches
-            # the legacy contract (callers used to ``except RuntimeError``
-            # for both "missing dependency" and "cannot connect").
             self._impl = _LegacyBackend(url)
 
     def send(self, payload_dict: dict[str, Any]) -> None:

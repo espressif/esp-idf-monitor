@@ -43,6 +43,7 @@ from typing import Type  # noqa: F401
 from typing import Union  # noqa: F401
 
 import serial
+from esp_pylib.errors import FatalError
 from esp_pylib.errors import NoSerialPortFoundError
 from esp_pylib.excepthook import install_exception_reporting
 from esp_pylib.logger import log
@@ -356,6 +357,8 @@ class Monitor:
         after sending has started keeps waiting, because the IDE may
         already be using the port and there is no cancel event. A further
         Ctrl+C raises `_MonitorAbort`, which quits without reopening the port.
+        ``FatalError`` after the event was sent also leaves the port released:
+        the IDE may still hold it.
         """
         if self.websocket_client is None:
             raise RuntimeError('Cannot wait for the IDE: WebSocket client is not configured')
@@ -482,7 +485,9 @@ class Monitor:
 class SerialMonitor(Monitor):
     def __exit__(self, exc_type, exc_val, exc_tb) -> None:  # type: ignore
         """Use 'with self' to temporarily disable monitoring behaviour"""
-        if exc_type is not None and issubclass(exc_type, _MonitorAbort):
+        # Keep the port released when the IDE may still own it: user abort,
+        # SIGTERM during handoff, or a WebSocket failure after the event was sent.
+        if exc_type is not None and issubclass(exc_type, (_MonitorAbort, FatalError)):
             return
         if not self.command_stream_mode:
             # the CommandReader was not stopped in __enter__
@@ -552,7 +557,7 @@ class SerialMonitor(Monitor):
 class LinuxMonitor(Monitor):
     def __exit__(self, exc_type, exc_val, exc_tb) -> None:  # type: ignore
         """Use 'with self' to temporarily disable monitoring behaviour"""
-        if exc_type is not None and issubclass(exc_type, _MonitorAbort):
+        if exc_type is not None and issubclass(exc_type, (_MonitorAbort, FatalError)):
             return
         if not self.command_stream_mode:
             # the CommandReader was not stopped in __enter__
@@ -792,4 +797,7 @@ def main() -> None:
     """
     install_monitor_log()
     install_exception_reporting()
-    _cli_invoke(_run_monitor)
+    try:
+        _cli_invoke(_run_monitor)
+    except FatalError as e:
+        log.die(str(e))
