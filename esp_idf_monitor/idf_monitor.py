@@ -37,6 +37,7 @@ from typing import Dict  # noqa: F401
 from typing import List  # noqa: F401
 from typing import NoReturn  # noqa: F401
 from typing import Optional  # noqa: F401
+from typing import Set
 from typing import Tuple  # noqa: F401
 from typing import Type  # noqa: F401
 from typing import Union  # noqa: F401
@@ -56,6 +57,7 @@ from esp_idf_monitor.base.ansi_color_converter import get_ansi_converter
 from esp_idf_monitor.base.argument_parser import invoke as _cli_invoke
 from esp_idf_monitor.base.command_reader import CommandReader
 from esp_idf_monitor.base.console_parser import ConsoleParser
+from esp_idf_monitor.base.console_parser import prompt_next_action
 from esp_idf_monitor.base.console_reader import ConsoleReader
 from esp_idf_monitor.base.constants import CTRL_C
 from esp_idf_monitor.base.constants import CTRL_H
@@ -109,6 +111,17 @@ def _create_console(command_stream_mode: bool):
         sys.stderr = real_stderr
 
 
+def _parse_ws_features(value: Optional[str] = None) -> Set[str]:
+    """Parse ``ESP_IDF_MONITOR_WS_FEATURES`` (or ``value``) into a feature set.
+
+    Comma-separated, case-insensitive. Empty tokens and surrounding spaces
+    are ignored. Unknown feature names are kept so callers can decide what
+    they support; an older monitor simply never looks for new names.
+    """
+    raw = value if value is not None else os.environ.get('ESP_IDF_MONITOR_WS_FEATURES', '')
+    return {f.strip().lower() for f in raw.split(',') if f.strip()}
+
+
 class _MonitorAbort(BaseException):
     """Stop the monitor without reopening the serial port.
 
@@ -152,6 +165,7 @@ class Monitor:
         rom_elf_file=None,  # type: Optional[str]
         command_stream_mode=False,  # type: bool
         non_interactive=None,  # type: Optional[bool]
+        ide_flash=False,  # type: bool
     ):
         if non_interactive is not None:
             log.warn(
@@ -162,6 +176,10 @@ class Monitor:
         self.event_queue = queue.Queue()  # type: queue.Queue
         self.cmd_queue = queue.Queue()  # type: queue.Queue
         self.command_stream_mode = command_stream_mode
+        # When True, flash menu commands are sent to the IDE over WebSocket
+        # instead of running idf.py locally. Set only when ``--ws`` is active
+        # and ``ESP_IDF_MONITOR_WS_FEATURES`` contains ``flash``.
+        self.ide_flash = ide_flash
         # ConsoleBase writes to stdout but never touches the TTY, so it is safe
         # to use when stdin is not attached to a terminal (pipe, file, CI).
         # The Console subclass requires a real TTY on construction.
@@ -290,6 +308,34 @@ class Monitor:
         # variables to the subprocess environment, letting callers influence the
         # build without target-specific parameters here (e.g. IDF_FLASH_FULL=1
         # for a full flash).
+        # When the IDE has opted in via ESP_IDF_MONITOR_WS_FEATURES=flash,
+        # delegate to the IDE instead of spawning idf.py/make locally.
+        if self.ide_flash and self.websocket_client:
+            full = bool(env_extra and env_extra.get('IDF_FLASH_FULL') == '1')
+            # Stay inside ``with self`` until the IDE replies. Leaving earlier
+            # reopens the serial port while the IDE may still be using it, and
+            # restarts the console reader before prompt_next_action reads a key.
+            with self:
+                result = self._ide_roundtrip(
+                    {'event': 'flash', 'port': self.serial.port, 'target': target, 'full': full},
+                    'flash_finished',
+                    'Still waiting for the IDE to finish flashing',
+                )
+                # Missing ``success`` is treated as success (optional field).
+                if isinstance(result, dict) and result.get('success') is False:
+                    if self.command_stream_mode:
+                        log.err('Flashing via IDE failed')
+                    else:
+                        prompt_next_action(
+                            'Flashing via IDE failed',
+                            self.console,
+                            self.console_parser,
+                            self.event_queue,
+                            self.cmd_queue,
+                        )
+                else:
+                    self.logger.output_enabled = True
+            return
         with self:
             run_make(
                 target,
@@ -608,6 +654,10 @@ def _run_monitor(
             pass
 
     ws_client = WebSocketClient(ws) if ws else None
+    # An environment variable (not a CLI flag) keeps an older monitor
+    # starting when a newer IDE advertises features it does not yet
+    # implement.
+    ide_flash = ws_client is not None and 'flash' in _parse_ws_features()
 
     elf_files_list = list(elf_files)
 
@@ -681,6 +731,7 @@ def _run_monitor(
             disable_auto_color,
             resolved_rom_elf,
             command_stream_mode,
+            ide_flash=ide_flash,
         )
 
         if save_log:

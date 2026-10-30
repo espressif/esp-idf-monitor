@@ -5,6 +5,7 @@
 Covers:
 * gdbstub detection vs IDE/CLI handoff (serial paused before notify)
 * coredump WebSocket wait without pausing the serial reader
+* flash delegated to the IDE only when ``ESP_IDF_MONITOR_WS_FEATURES`` opts in
 """
 
 from __future__ import annotations
@@ -30,6 +31,7 @@ from esp_idf_monitor.base.serial_reader import SerialReader
 from esp_idf_monitor.base.web_socket_client import WebSocketWaitInterrupted
 from esp_idf_monitor.idf_monitor import SerialMonitor
 from esp_idf_monitor.idf_monitor import _MonitorAbort
+from esp_idf_monitor.idf_monitor import _parse_ws_features
 
 # Valid gdbstub stop reason: payload ``T0b``, checksum 0xe6
 GDB_STUB_PACKET = b'$T0b#e6'
@@ -53,6 +55,7 @@ def _make_monitor(
     tmp_path,
     websocket_client: Any | None = None,
     command_stream_mode: bool = True,
+    ide_flash: bool = False,
 ) -> SerialMonitor:
     """Build a SerialMonitor with mocked serial reader / console."""
     with patch('esp_idf_monitor.idf_monitor.SerialReader') as reader_cls, patch(
@@ -69,6 +72,7 @@ def _make_monitor(
             websocket_client=websocket_client,
             command_stream_mode=command_stream_mode,
             enable_address_decoding=False,
+            ide_flash=ide_flash,
         )
     # Ensure stop/start are trackable MagicMocks (SerialReader is mocked).
     monitor.serial_reader = reader
@@ -303,6 +307,180 @@ class TestKeyboardInterruptStillWritesCtrlC:
 
         assert written and written[0] == b'\x03'
         ws.roundtrip.assert_not_called()
+
+
+class TestParseWsFeatures:
+    def test_unset_is_empty(self, monkeypatch):
+        monkeypatch.delenv('ESP_IDF_MONITOR_WS_FEATURES', raising=False)
+        assert _parse_ws_features() == set()
+
+    def test_mixed_case_and_spaces(self):
+        assert _parse_ws_features(' Flash , OTHER ') == {'flash', 'other'}
+
+    def test_unknown_features_kept(self):
+        assert _parse_ws_features('flash,future_thing') == {'flash', 'future_thing'}
+
+    def test_empty_tokens_ignored(self):
+        assert _parse_ws_features(',,flash,,') == {'flash'}
+
+
+class TestFlashIdeEvents:
+    def test_ws_without_opt_in_uses_subprocess(self, tmp_path):
+        ws = MagicMock()
+        monitor = _make_monitor(tmp_path, websocket_client=ws, ide_flash=False)
+        with patch('esp_idf_monitor.idf_monitor.run_make') as local_make:
+            monitor.run_make('flash')
+        local_make.assert_called_once()
+        ws.roundtrip.assert_not_called()
+
+    def test_run_make_delegates_to_websocket(self, tmp_path):
+        ws = MagicMock()
+        ws.roundtrip.return_value = {'event': 'flash_finished', 'success': True}
+        monitor = _make_monitor(tmp_path, websocket_client=ws, ide_flash=True)
+
+        with patch('esp_idf_monitor.idf_monitor.run_make') as local_make:
+            monitor.run_make('flash')
+
+        local_make.assert_not_called()
+        ws.roundtrip.assert_called_once_with(
+            {'event': 'flash', 'port': '/dev/ttyUSB0', 'target': 'flash', 'full': False},
+            'flash_finished',
+        )
+
+    def test_run_make_full_flash_sets_full_flag(self, tmp_path):
+        ws = MagicMock()
+        ws.roundtrip.return_value = {'event': 'flash_finished'}
+        monitor = _make_monitor(tmp_path, websocket_client=ws, ide_flash=True)
+
+        monitor.run_make('flash', env_extra={'IDF_FLASH_FULL': '1'})
+
+        ws.roundtrip.assert_called_once_with(
+            {'event': 'flash', 'port': '/dev/ttyUSB0', 'target': 'flash', 'full': True},
+            'flash_finished',
+        )
+
+    def test_run_make_full_flag_ignores_zero(self, tmp_path):
+        ws = MagicMock()
+        ws.roundtrip.return_value = {'event': 'flash_finished'}
+        monitor = _make_monitor(tmp_path, websocket_client=ws, ide_flash=True)
+
+        monitor.run_make('flash', env_extra={'IDF_FLASH_FULL': '0'})
+
+        ws.roundtrip.assert_called_once_with(
+            {'event': 'flash', 'port': '/dev/ttyUSB0', 'target': 'flash', 'full': False},
+            'flash_finished',
+        )
+
+    @pytest.mark.parametrize(
+        'target',
+        ['flash', 'app-flash', 'encrypted-flash', 'encrypted-app-flash'],
+    )
+    def test_run_make_flash_targets(self, tmp_path, target):
+        ws = MagicMock()
+        ws.roundtrip.return_value = {'event': 'flash_finished'}
+        monitor = _make_monitor(tmp_path, websocket_client=ws, ide_flash=True)
+
+        monitor.run_make(target)
+
+        assert ws.roundtrip.call_args == call(
+            {'event': 'flash', 'port': '/dev/ttyUSB0', 'target': target, 'full': False},
+            'flash_finished',
+        )
+
+    def test_run_make_failure_logs_in_command_stream_mode(self, tmp_path):
+        ws = MagicMock()
+        ws.roundtrip.return_value = {'event': 'flash_finished', 'success': False}
+        monitor = _make_monitor(tmp_path, websocket_client=ws, ide_flash=True, command_stream_mode=True)
+
+        with patch('esp_idf_monitor.idf_monitor.log.err') as log_err:
+            monitor.run_make('flash')
+
+        log_err.assert_called_once_with('Flashing via IDE failed')
+
+    def test_run_make_failure_prompts_in_interactive(self, tmp_path):
+        ws = MagicMock()
+        ws.roundtrip.return_value = {'event': 'flash_finished', 'success': False}
+        monitor = _make_monitor(tmp_path, websocket_client=ws, ide_flash=True, command_stream_mode=False)
+        order: list[str] = []
+        monitor.serial_reader.stop.side_effect = lambda: order.append('serial-stop')
+        monitor.serial_reader.start.side_effect = lambda: order.append('serial-start')
+        monitor.console_reader.stop.side_effect = lambda: order.append('console-stop')
+        monitor.console_reader.start.side_effect = lambda: order.append('console-start')
+
+        def on_prompt(*_args, **_kwargs):
+            order.append('prompt')
+
+        with patch('esp_idf_monitor.idf_monitor.prompt_next_action', side_effect=on_prompt) as prompt:
+            monitor.run_make('flash')
+
+        prompt.assert_called_once()
+        assert prompt.call_args[0][0] == 'Flashing via IDE failed'
+        # The console reader must stay stopped while the prompt reads a key.
+        assert order == ['serial-stop', 'console-stop', 'prompt', 'console-start', 'serial-start']
+
+    @pytest.mark.parametrize('command_stream_mode', [False, True])
+    def test_run_make_ctrl_c_keeps_waiting_for_flash_finished(self, tmp_path, command_stream_mode):
+        ws = MagicMock()
+        order: list[str] = []
+        monitor = _make_monitor(
+            tmp_path,
+            websocket_client=ws,
+            ide_flash=True,
+            command_stream_mode=command_stream_mode,
+        )
+        monitor.serial_reader.stop.side_effect = lambda: order.append('stop')
+        monitor.serial_reader.start.side_effect = lambda: order.append('start')
+
+        def roundtrip(payload, _wait_event):
+            order.append(payload['event'])
+            raise WebSocketWaitInterrupted
+
+        def wait(expect):
+            order.append('wait')
+            assert expect == [('event', 'flash_finished')]
+            assert 'start' not in order
+            return {'event': 'flash_finished', 'success': True}
+
+        ws.roundtrip.side_effect = roundtrip
+        ws.wait.side_effect = wait
+
+        with patch('esp_idf_monitor.idf_monitor.prompt_next_action') as prompt:
+            monitor.run_make('flash')
+
+        prompt.assert_not_called()
+        ws.roundtrip.assert_called_once()
+        assert order == ['stop', 'flash', 'wait', 'start']
+
+    def test_run_make_second_ctrl_c_quits_without_reopening_port(self, tmp_path):
+        ws = MagicMock()
+        order: list[str] = []
+        monitor = _make_monitor(tmp_path, websocket_client=ws, ide_flash=True, command_stream_mode=True)
+        monitor.serial_reader.stop.side_effect = lambda: order.append('stop')
+        monitor.serial_reader.start.side_effect = lambda: order.append('start')
+        ws.roundtrip.side_effect = WebSocketWaitInterrupted
+
+        def wait(_expect):
+            order.append('wait')
+            raise KeyboardInterrupt
+
+        ws.wait.side_effect = wait
+
+        monitor.console_reader.alive = True
+        monitor.serial_reader.alive = True
+        with patch.object(monitor, '_pre_start'), patch.object(
+            monitor, '_main_loop', side_effect=lambda: monitor.run_make('flash')
+        ):
+            monitor.main_loop()
+
+        monitor.serial_reader.start.assert_not_called()
+        assert order == ['stop', 'wait', 'stop']
+
+    def test_run_make_without_ws_uses_subprocess(self, tmp_path):
+        monitor = _make_monitor(tmp_path, websocket_client=None, ide_flash=False)
+        with patch('esp_idf_monitor.idf_monitor.run_make') as local_make:
+            monitor.run_make('flash', env_extra={'IDF_FLASH_FULL': '1'})
+        local_make.assert_called_once()
+        assert local_make.call_args.kwargs.get('env_extra') == {'IDF_FLASH_FULL': '1'}
 
 
 def test_post_handoff_reopen_retries_instead_of_exiting():

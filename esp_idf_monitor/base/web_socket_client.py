@@ -19,11 +19,10 @@ the same ``WebSocket sent: ...`` / ``WebSocket received: ...`` log lines
 the IDE integration target test (``pytest_monitor_ide_integration.py``)
 greps for.
 
-Wire format (both backends): ``{"type": "event", "event": "<name>", ...}``.
-The pylib backend produces this via `esp_pylib.ws.send_event`; the
-legacy backend serializes the dict directly so callers should already be
-passing an envelope-ready payload (which the monitor's gdbhelper /
-coredump call sites do).
+Wire format: the pylib backend sends
+``{"type": "event", "event": "<name>", ...}`` via `esp_pylib.ws.send_event`.
+The legacy backend serializes the payload dict as-is, so its messages carry
+no ``type`` key.
 """
 
 from __future__ import annotations
@@ -215,7 +214,7 @@ class _LegacyBackend:
 
 
 class WebSocketClient:
-    """Public WebSocket client used by the gdb / coredump handlers.
+    """Public WebSocket client used by the gdb / coredump / flash handlers.
 
     Dispatches to a pylib- or websocket-client-backed implementation
     based on what's available at construction time. Both backends share
@@ -226,8 +225,17 @@ class WebSocketClient:
 
     * ``{'event': 'gdb_stub', 'port': '/dev/ttyUSB1', 'prog': 'build/elf'}``
     * ``{'event': 'coredump', 'file': '/tmp/xy', 'prog': 'build/elf'}``
+    * ``{'event': 'flash', 'port': '/dev/ttyUSB1', 'target': '<name>',
+      'full': False}`` where ``target`` is one of ``flash``, ``app-flash``,
+      ``encrypted-flash``, or ``encrypted-app-flash``. An encrypted full
+      flash is sent as ``encrypted-flash`` with ``full: False`` (esptool
+      forces a full flash for encrypted images).
 
-    Expected close-out from the IDE: ``{'event': 'debug_finished'}``.
+    Expected close-out from the IDE:
+
+    * ``{'event': 'debug_finished'}`` after gdb_stub / coredump
+    * ``{'event': 'flash_finished', 'success': True}`` after flash
+      (``success`` is optional; missing is treated as success)
     """
 
     _impl: Any  # _PylibBackend or _LegacyBackend; lazy union annotation
