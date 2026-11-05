@@ -25,6 +25,7 @@ import sys
 from unittest.mock import MagicMock
 
 import pytest
+from esp_pylib.errors import FatalError
 
 from esp_idf_monitor.base.monitor_log import install_monitor_log
 
@@ -228,16 +229,71 @@ class TestPylibBackend:
         assert "WebSocket sent: {'event': 'gdb_stub'" in err
         assert "WebSocket received: {'event': 'debug_finished'}" in err
 
+    @pytest.mark.usefixtures('restore_module')
+    def test_roundtrip_emits_shared_log_lines(self, capsys):
+        install_monitor_log()
+        fake_pylib = MagicMock()
+        fake_pylib.wait_for_event.return_value = {'event': 'debug_finished'}
+        wsc = _reload_module(monkeypatch_pylib=fake_pylib)
+
+        client = wsc.WebSocketClient('ws://localhost:9')
+        result = client.roundtrip(
+            {'event': 'gdb_stub', 'port': '/dev/ttyUSB0', 'prog': 'app.elf'},
+            'debug_finished',
+        )
+
+        assert result == {'event': 'debug_finished'}
+        err = capsys.readouterr().err
+        assert 'Communicating through WebSocket' in err
+        assert 'Waiting for debug finished event' in err
+        assert 'Communications through WebSocket is finished' in err
+        fake_pylib.send_event.assert_called_once_with(event='gdb_stub', port='/dev/ttyUSB0', prog='app.elf')
+
+    @pytest.mark.usefixtures('restore_module')
+    def test_roundtrip_interrupt_after_send_is_wait_interrupted(self):
+        install_monitor_log()
+        fake_pylib = MagicMock()
+        fake_pylib.wait_for_event.side_effect = KeyboardInterrupt
+        wsc = _reload_module(monkeypatch_pylib=fake_pylib)
+
+        client = wsc.WebSocketClient('ws://localhost:9')
+        with pytest.raises(wsc.WebSocketWaitInterrupted):
+            client.roundtrip({'event': 'gdb_stub'}, 'debug_finished')
+
+    @pytest.mark.usefixtures('restore_module')
+    def test_wait_returns_received_payload(self):
+        install_monitor_log()
+        fake_pylib = MagicMock()
+        fake_pylib.wait_for_event.return_value = {'event': 'flash_finished', 'success': False}
+        wsc = _reload_module(monkeypatch_pylib=fake_pylib)
+
+        client = wsc.WebSocketClient('ws://localhost:9')
+        result = client.wait([('event', 'flash_finished')])
+        assert result == {'event': 'flash_finished', 'success': False}
+
+    @pytest.mark.usefixtures('restore_module')
+    def test_roundtrip_interrupt_before_send_stays_keyboard_interrupt(self, monkeypatch):
+        install_monitor_log()
+        fake_pylib = MagicMock()
+        wsc = _reload_module(monkeypatch_pylib=fake_pylib)
+
+        def note(msg):
+            if msg == 'Communicating through WebSocket':
+                raise KeyboardInterrupt
+
+        monkeypatch.setattr(wsc.log, 'note', note)
+        client = wsc.WebSocketClient('ws://localhost:9')
+        with pytest.raises(KeyboardInterrupt) as exc_info:
+            client.roundtrip({'event': 'gdb_stub'}, 'debug_finished')
+        assert not isinstance(exc_info.value, wsc.WebSocketWaitInterrupted)
+
 
 class TestLegacyBackend:
     @pytest.mark.usefixtures('restore_module')
     def test_init_raises_when_websocket_missing(self):
-        """Both backends raise something a caller can catch as ``RuntimeError``:
-        the legacy backend raises plain ``RuntimeError`` directly, and the pylib
-        backend raises ``esp_pylib.errors.FatalError`` (itself a ``RuntimeError``
-        subclass). So ``except RuntimeError`` works regardless of backend."""
+        """Both backends use FatalError for expected operational failures."""
         wsc = _reload_module(monkeypatch_pylib=None, monkeypatch_websocket=None)
-        with pytest.raises(RuntimeError, match='websocket_client'):
+        with pytest.raises(FatalError, match='websocket_client'):
             wsc._LegacyBackend('ws://localhost:9')
 
     @pytest.mark.usefixtures('restore_module')

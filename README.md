@@ -21,6 +21,7 @@ Other advanced topics like configuration file will be described in the following
       - [Share Configuration Across Tools](#share-configuration-across-tools)
   - [Syntax](#syntax)
 - [Embedded Command Execution](#embedded-command-execution)
+- [IDE Integration](#ide-integration)
 
 ## Installation
 
@@ -86,6 +87,8 @@ printf 'reset\nexpect ALL TESTS PASSED\n' | idf-monitor /dev/ttyUSB0
 | `exit` | Quit the monitor; pending serial output is drained first |
 
 Empty lines and lines starting with `#` are ignored. Every processed command is echoed to **standard error**, so the progress of the script stays visible even when standard output is redirected to a file.
+
+If the monitor receives `SIGTERM` while a `flash`, `flash-all`, or `app-flash` command is running, it waits for the build to finish and then quits, so the build does not keep using the serial port after the monitor exits.
 
 The line ending is stripped before an `expect` match, so a `$` anchor works regardless of whether the device terminates lines with `LF` or `CRLF`.
 
@@ -297,6 +300,36 @@ For your security and to ensure predictable behavior, IDF Monitor:
 - Executes all commands with `shell=False`, preventing shell metacharacters (`&&`, `;`, `|`, `>`) from being interpreted
 
 This intentional limitation ensures that only specific, safe espefuse operations are available. Any future extensions would require careful review for security implications.
+
+## IDE Integration
+
+When an IDE launches the monitor with `--ws <url>` (or the `ESP_IDF_MONITOR_WS` environment variable), the monitor connects to that WebSocket URL and sends events so the IDE can debug the chip, decode a core dump, or flash the chip.
+
+### Events
+
+| Monitor sends | IDE replies | Purpose |
+|---------------|-------------|---------|
+| `{"event": "gdb_stub", "port": "...", "prog": "..."}` | `{"event": "debug_finished"}` | Hand the serial port to the IDE for a GDB session. The monitor releases the port before waiting. |
+| `{"event": "coredump", "file": "...", "prog": "..."}` | `{"event": "debug_finished"}` | Ask the IDE to decode a core dump from the named file. The serial port stays open so the reboot log is not lost. |
+| `{"event": "flash", "port": "...", "target": "<name>", "full": false}` | `{"event": "flash_finished", "success": true}` | Delegate a flash command to the IDE. Sent only when the IDE has opted in (see below). The serial port stays released until the IDE replies. |
+
+`port` identifies the serial port used by this monitor session. `target` is one of `flash`, `app-flash`, `encrypted-flash`, or `encrypted-app-flash`. An encrypted full flash is sent as `encrypted-flash` with `"full": false`, because esptool forces a full flash for encrypted images. The `success` field in `flash_finished` is optional; a missing value is treated as success.
+
+After a `gdb_stub` or `flash` event, the IDE must release the serial port before it replies. The monitor reopens the port as soon as the reply arrives. If the port is still busy, the monitor retries until it can open it again.
+
+`Ctrl+C` does not stop an IDE GDB session or an IDE flash. The monitor keeps the serial port released until `debug_finished` or `flash_finished`. Pressing `Ctrl+C` again while still waiting quits the monitor without reopening the port. In Command-Stream Mode, `SIGTERM` quits immediately without reopening the port.
+
+### Optional WebSocket Features
+
+Setting `--ws` does not send flash commands to the IDE. An older IDE ignores the `flash` event and never replies, so the monitor would wait forever. To turn this on, set:
+
+```sh
+export ESP_IDF_MONITOR_WS_FEATURES=flash
+```
+
+The value is a comma-separated, case-insensitive list. Unknown names are ignored, so a newer IDE can advertise features an older monitor does not yet implement. The opt-in is an environment variable rather than a CLI option so that an older monitor still starts when a newer IDE sets it.
+
+Without `flash` in `ESP_IDF_MONITOR_WS_FEATURES`, flash menu commands (`Ctrl+T` `Ctrl+F` and related) keep running `idf.py` / `make` locally, even when `--ws` is set.
 
 ## Contributing
 

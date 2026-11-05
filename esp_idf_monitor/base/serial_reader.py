@@ -1,4 +1,4 @@
-# SPDX-FileCopyrightText: 2015-2024 Espressif Systems (Shanghai) CO LTD
+# SPDX-FileCopyrightText: 2015-2026 Espressif Systems (Shanghai) CO LTD
 # SPDX-License-Identifier: Apache-2.0
 
 import queue  # noqa: F401
@@ -38,6 +38,10 @@ class SerialReader(Reader):
         self.gdb_exit = False
         self.reset = reset
         self.open_port_attempts = open_port_attempts
+        # True after a successful open in this process. A later start() (for
+        # example after a flash or a GDB session) must retry like a mid-session
+        # reconnect instead of applying the one-shot cold-start exit.
+        self._had_open_session = False
         self.reset_strategy = Reset(serial_instance, target)
         if not hasattr(self.serial, 'cancel_read'):
             # enable timeout for checking alive flag,
@@ -46,7 +50,9 @@ class SerialReader(Reader):
 
     def run(self):
         #  type: () -> None
-        if not self.serial.is_open:
+        if self.serial.is_open:
+            self._had_open_session = True
+        else:
             self.serial.baudrate = self.baud
             try:
                 # We can come to this thread at startup or from external application line GDB.
@@ -55,16 +61,20 @@ class SerialReader(Reader):
                 self.open_serial(reset=self.reset)
                 # Successfully connected, so any further reconnections should occur without a reset.
                 self.reset = False
+                self._had_open_session = True
             except (serial.SerialException, OSError) as e:
-                print(e)
-                if self.open_port_attempts == 1:
+                if self.open_port_attempts == 1 and not self._had_open_session:
                     # If the connection to the port fails and --open-port-attempts was not specified,
                     # recommend other available ports and exit. get_port_names() already
                     # excludes the macOS virtual ports the legacy FILTERED_PORTS list
                     # used to filter manually.
+                    print(e)
                     port_list = '\n'.join(get_port_names())
                     log.err(f'Connection to {self.serial.portstr} failed. Available ports:\n{port_list}')
                     return
+                # After an earlier open (for example after a flash or a GDB session), or with
+                # --open-port-attempts != 1, wait for the port the same way as after a disconnect.
+                self._wait_for_reconnect(e)
             self.gdb_exit = False
         try:
             while self.alive:
@@ -78,25 +88,30 @@ class SerialReader(Reader):
                     data = b''
                     # self.serial.open() was successful before, therefore, this is an issue related to
                     # the disappearance of the device
-                    log.err(str(e))
-                    log.print('Waiting for the device to reconnect', end='', style='yellow')
-                    self.close_serial()
-                    while self.alive:  # so that exiting monitor works while waiting
-                        try:
-                            time.sleep(RECONNECT_DELAY)
-                            # reset on reconnect can be unexpected for wakeup from deepsleep using JTAG
-                            self.open_serial(reset=self.reset)
-                            self.reset = False
-                            break  # device connected
-                        except (serial.SerialException, OSError):
-                            log.print('.', end='', style='yellow')
-                            sys.stderr.flush()
-
-                    log.print('')  # go to new line
+                    self._wait_for_reconnect(e)
                 if data:
                     self.event_queue.put((TAG_SERIAL, data), False)
         finally:
             self.close_serial()
+
+    def _wait_for_reconnect(self, error):
+        # type: (Exception) -> None
+        log.err(str(error))
+        log.print('Waiting for the device to reconnect', end='', style='yellow')
+        self.close_serial()
+        while self.alive:  # so that exiting monitor works while waiting
+            try:
+                time.sleep(RECONNECT_DELAY)
+                # reset on reconnect can be unexpected for wakeup from deepsleep using JTAG
+                self.open_serial(reset=self.reset)
+                self.reset = False
+                self._had_open_session = True
+                break  # device connected
+            except (serial.SerialException, OSError):
+                log.print('.', end='', style='yellow')
+                sys.stderr.flush()
+
+        log.print('')  # go to new line
 
     def open_serial(self, reset: bool) -> None:
         # set the DTR/RTS into LOW prior open

@@ -1,4 +1,4 @@
-# SPDX-FileCopyrightText: 2022-2023 Espressif Systems (Shanghai) CO LTD
+# SPDX-FileCopyrightText: 2022-2026 Espressif Systems (Shanghai) CO LTD
 # SPDX-License-Identifier: Unlicense OR CC0-1.0
 import itertools
 import json
@@ -6,6 +6,7 @@ import logging
 import multiprocessing
 import os
 import re
+from typing import Dict
 from typing import List
 
 import pexpect
@@ -23,8 +24,13 @@ class IDEWSProtocol(WebSocket):
             logging.info(f'Server ignores error: {e}')
             return
         event = j.get('event')
+        payload: Dict[str, object]
         if event and 'prog' in j and ((event == 'gdb_stub' and 'port' in j) or (event == 'coredump' and 'file' in j)):
             payload = {'event': 'debug_finished'}
+            self.sendMessage(json.dumps(payload))
+            logging.info(f'Server sent: {payload}')
+        elif event == 'flash' and 'port' in j and 'target' in j and 'full' in j:
+            payload = {'event': 'flash_finished', 'success': True}
             self.sendMessage(json.dumps(payload))
             logging.info(f'Server sent: {payload}')
         else:
@@ -107,6 +113,48 @@ def test_monitor_ide_integration(
         p.expect(re.compile(r"WebSocket received: \{'event': 'debug_finished'\}"))
         p.expect_exact('Communications through WebSocket is finished')
         # end monitor and wait for proper termination to ensure complete coverage report
+        p.sendcontrol(']')
+        p.expect_exact(pexpect.EOF)
+
+
+@pytest.mark.esp32
+@pytest.mark.generic
+@pytest.mark.parametrize('config', ['gdb_stub'], indirect=True)
+def test_monitor_ide_flash(coverage_run: List[str], dut: Dut, webSocketServer: WebSocketServer) -> None:
+    # The port needs to be closed because esp_idf_monitor will connect to it
+    dut.serial.close()
+
+    monitor_cmd = ' '.join(
+        itertools.chain(
+            coverage_run,
+            [
+                '-m',
+                'esp_idf_monitor',
+                os.path.join(dut.app.binary_path, 'panic.elf'),
+                '--port',
+                str(dut.serial.port),
+                '--ws',
+                f'ws://{webSocketServer.HOST}:{webSocketServer.port.value}',  # type: ignore
+            ],
+        )
+    )
+    monitor_log_path = os.path.join(dut.logdir, 'monitor.txt')
+    env = os.environ.copy()
+    env['ESP_IDF_MONITOR_WS_FEATURES'] = 'flash'
+
+    with open(monitor_log_path, 'w') as log, pexpect.spawn(
+        monitor_cmd, logfile=log, timeout=5, encoding='utf-8', codec_errors='ignore', env=env
+    ) as p:
+        p.expect(re.compile(r'esp-idf-monitor'), timeout=10)
+        # Menu flash is Ctrl+T then Ctrl+F. The test app panics after two
+        # seconds, which stops the console reader, so send the shortcut now.
+        p.sendcontrol('t')
+        p.sendcontrol('f')
+        p.expect_exact('Communicating through WebSocket')
+        p.expect(re.compile(r"WebSocket sent: \{.*'event': 'flash'"))
+        p.expect_exact('Waiting for flash finished event')
+        p.expect(re.compile(r"WebSocket received: \{.*'event': 'flash_finished'"))
+        p.expect_exact('Communications through WebSocket is finished')
         p.sendcontrol(']')
         p.expect_exact(pexpect.EOF)
 

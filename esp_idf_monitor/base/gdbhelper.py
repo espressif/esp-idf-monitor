@@ -1,22 +1,18 @@
-# SPDX-FileCopyrightText: 2023 Espressif Systems (Shanghai) CO LTD
+# SPDX-FileCopyrightText: 2023-2026 Espressif Systems (Shanghai) CO LTD
 # SPDX-License-Identifier: Apache-2.0
 import re
 import subprocess
 from typing import List  # noqa: F401
-from typing import Optional  # noqa: F401
 
 from esp_pylib.logger import log
 
-from .web_socket_client import WebSocketClient  # noqa: F401
-
 
 class GDBHelper:
-    def __init__(self, toolchain_prefix, websocket_client, elf_files, port, baud_rate):
-        # type: (str, Optional[WebSocketClient], List[str], int, int) -> None
+    def __init__(self, toolchain_prefix, elf_files, port, baud_rate):
+        # type: (str, List[str], int, int) -> None
         self._gdb_buffer = b''  # type: bytes
         self._gdb_exit = False  # type: bool
         self.toolchain_prefix = toolchain_prefix
-        self.websocket_client = websocket_client
         self.elf_files = elf_files
         self.port = port
         self.baud_rate = baud_rate
@@ -84,6 +80,11 @@ class GDBHelper:
 
     def check_gdb_stub_trigger(self, line):
         # type: (bytes) -> bool
+        """Return True when ``line`` contains a valid gdbstub stop packet.
+
+        Detection only — IDE / CLI handoff is done by the monitor after it
+        pauses the serial reader.
+        """
         line = self.gdb_buffer + line
         self.gdb_buffer = b''
         m = re.search(b'\\$(T..)#(..)', line)  # look for a gdb "reason" for a break
@@ -94,14 +95,6 @@ class GDBHelper:
             except ValueError:  # payload wasn't valid hex digits
                 return False
             if chsum == calc_chsum:
-                if self.websocket_client:
-                    log.note('Communicating through WebSocket')
-                    self.websocket_client.send({'event': 'gdb_stub', 'port': self.port, 'prog': self.elf_files[0]})
-                    log.note('Waiting for debug finished event')
-                    self.websocket_client.wait([('event', 'debug_finished')])
-                    log.note('Communications through WebSocket is finished')
-                else:
-                    return True
-            else:
-                log.err(f'Malformed gdb message... calculated checksum {chsum:02x} received {calc_chsum:02x}')
+                return True
+            log.err(f'Malformed gdb message... calculated checksum {chsum:02x} received {calc_chsum:02x}')
         return False

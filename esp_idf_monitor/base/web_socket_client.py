@@ -12,18 +12,17 @@ Dispatches between two backends:
   available because its ``websockets`` dependency requires Python >= 3.8.
 
 The public `WebSocketClient` keeps its historical
-``send(payload_dict)`` / ``wait(expect_iterable)`` / ``close()`` API so
-callers in `esp_idf_monitor.base.gdbhelper` and
-`esp_idf_monitor.base.coredump` need no changes. Both backends emit
+``send(payload_dict)`` / ``wait(expect_iterable)`` / ``close()`` API and
+adds ``roundtrip(payload_dict, wait_event)``, which sends an event and
+waits for the IDE reply. Both backends emit
 the same ``WebSocket sent: ...`` / ``WebSocket received: ...`` log lines
 the IDE integration target test (``pytest_monitor_ide_integration.py``)
 greps for.
 
-Wire format (both backends): ``{"type": "event", "event": "<name>", ...}``.
-The pylib backend produces this via `esp_pylib.ws.send_event`; the
-legacy backend serializes the dict directly so callers should already be
-passing an envelope-ready payload (which the monitor's gdbhelper /
-coredump call sites do).
+Wire format: the pylib backend sends
+``{"type": "event", "event": "<name>", ...}`` via `esp_pylib.ws.send_event`.
+The legacy backend serializes the payload dict as-is, so its messages carry
+no ``type`` key.
 """
 
 from __future__ import annotations
@@ -34,6 +33,7 @@ import time
 from typing import Any
 from typing import Iterable
 
+from esp_pylib.errors import FatalError
 from esp_pylib.logger import log
 
 # Imported as a module so tests can swap ``esp_pylib.ws`` in ``sys.modules``
@@ -73,6 +73,10 @@ def _pylib_available() -> bool:
     return True
 
 
+class WebSocketWaitInterrupted(KeyboardInterrupt):
+    """The request was sent, but waiting for the IDE was interrupted."""
+
+
 class _PylibBackend:
     """Backend that delegates to `esp_pylib.ws`."""
 
@@ -105,7 +109,7 @@ class _PylibBackend:
         # the call site passed in.
         log.note(f'WebSocket sent: {payload_dict}')
 
-    def wait(self, expect_iterable: Iterable[tuple[str, Any]]) -> None:
+    def wait(self, expect_iterable: Iterable[tuple[str, Any]]) -> Any:
         """Wait for an event matching ``expect_iterable``.
 
         Current callers only ever pass a single-tuple iterable like
@@ -114,20 +118,18 @@ class _PylibBackend:
         than silent best-effort matching. We raise
         `esp_pylib.errors.FatalError` to make that promotion an
         observable build failure.
+
+        Returns the received payload dict.
         """
         # Materialise once so we can both validate length and dispatch.
         expectations = list(expect_iterable)
         assert _pylib_ws is not None
-        # Late import: in failure cases we still want a clear "esp-pylib
-        # not installed" error from ``_pylib_available()`` before this
-        # code path runs.
-        from esp_pylib.errors import FatalError
-
         if len(expectations) != 1 or expectations[0][0] != 'event':
             raise FatalError(f'Unsupported WebSocket wait expectation: {expectations!r}')
         event_name = expectations[0][1]
         result = _pylib_ws.wait_for_event(event_name)
         log.note(f'WebSocket received: {result}')
+        return result
 
     def close(self) -> None:
         assert _pylib_ws is not None
@@ -138,8 +140,8 @@ class _LegacyBackend:
     """Fallback backend using the ``websocket-client`` package.
 
     Kept only for Python 3.7 (and any environment where esp-pylib's
-    ``[ide]`` extra didn't install). The behaviour is the same as the
-    pre-migration implementation, just lifted into its own class.
+    ``[ide]`` extra didn't install). Like the pylib backend, it raises
+    `esp_pylib.errors.FatalError` when it cannot connect, send, or receive.
     """
 
     RETRIES = 3
@@ -155,7 +157,7 @@ class _LegacyBackend:
         # surfacing a misleading "Cannot connect" after three retry
         # attempts against a no-op stub.
         if websocket is None:
-            raise RuntimeError('Please install the websocket_client package for IDE integration!')
+            raise FatalError('Please install the websocket_client package for IDE integration!')
         self.url = url
         self._connect()
 
@@ -169,7 +171,7 @@ class _LegacyBackend:
                 log.err(f'WebSocket connection error: {e}')
             time.sleep(self.CONNECTION_RETRY_DELAY)
         else:
-            raise RuntimeError('Cannot connect to WebSocket server')
+            raise FatalError('Cannot connect to WebSocket server')
 
     def close(self) -> None:
         try:
@@ -188,9 +190,9 @@ class _LegacyBackend:
             except Exception as e:
                 log.err(f'WebSocket send error: {e}')
                 self._connect()
-        raise RuntimeError('Cannot send to WebSocket server')
+        raise FatalError('Cannot send to WebSocket server')
 
-    def wait(self, expect_iterable: Iterable[tuple[str, Any]]) -> None:
+    def wait(self, expect_iterable: Iterable[tuple[str, Any]]) -> Any:
         expectations = list(expect_iterable)
         for _ in range(self.RETRIES):
             try:
@@ -202,13 +204,13 @@ class _LegacyBackend:
             obj = json.loads(r)
             if all(k in obj and obj[k] == v for k, v in expectations):
                 log.note(f'WebSocket received: {obj}')
-                return
+                return obj
             log.err(f'WebSocket expected: {dict(expectations)}, received: {obj}')
-        raise RuntimeError('Cannot receive from WebSocket server')
+        raise FatalError('Cannot receive from WebSocket server')
 
 
 class WebSocketClient:
-    """Public WebSocket client used by the gdb / coredump handlers.
+    """Public WebSocket client used by the gdb / coredump / flash handlers.
 
     Dispatches to a pylib- or websocket-client-backed implementation
     based on what's available at construction time. Both backends share
@@ -219,8 +221,17 @@ class WebSocketClient:
 
     * ``{'event': 'gdb_stub', 'port': '/dev/ttyUSB1', 'prog': 'build/elf'}``
     * ``{'event': 'coredump', 'file': '/tmp/xy', 'prog': 'build/elf'}``
+    * ``{'event': 'flash', 'port': '/dev/ttyUSB1', 'target': '<name>',
+      'full': False}`` where ``target`` is one of ``flash``, ``app-flash``,
+      ``encrypted-flash``, or ``encrypted-app-flash``. An encrypted full
+      flash is sent as ``encrypted-flash`` with ``full: False`` (esptool
+      forces a full flash for encrypted images).
 
-    Expected close-out from the IDE: ``{'event': 'debug_finished'}``.
+    Expected close-out from the IDE:
+
+    * ``{'event': 'debug_finished'}`` after gdb_stub / coredump
+    * ``{'event': 'flash_finished', 'success': True}`` after flash
+      (``success`` is optional; missing is treated as success)
     """
 
     _impl: Any  # _PylibBackend or _LegacyBackend; lazy union annotation
@@ -229,16 +240,39 @@ class WebSocketClient:
         if _pylib_available():
             self._impl = _PylibBackend(url)
         else:
-            # Surfacing the websocket-client requirement up front matches
-            # the legacy contract (callers used to ``except RuntimeError``
-            # for both "missing dependency" and "cannot connect").
             self._impl = _LegacyBackend(url)
 
     def send(self, payload_dict: dict[str, Any]) -> None:
         self._impl.send(payload_dict)
 
-    def wait(self, expect_iterable: Iterable[tuple[str, Any]]) -> None:
-        self._impl.wait(expect_iterable)
+    def wait(self, expect_iterable: Iterable[tuple[str, Any]]) -> Any:
+        return self._impl.wait(expect_iterable)
+
+    def roundtrip(self, payload_dict: dict[str, Any], wait_event: str) -> Any:
+        """Send ``payload_dict`` and block until ``wait_event`` arrives.
+
+        Emits the same ``Communicating through WebSocket`` /
+        ``Waiting for ...`` / ``Communications through WebSocket is finished``
+        log lines that the IDE integration target test greps for.
+        Returns the received payload dict.
+
+        Raises `WebSocketWaitInterrupted` on Ctrl+C once ``send()`` has
+        started, so callers keep the serial port released until the IDE
+        replies. Ctrl+C before ``send()`` stays a plain ``KeyboardInterrupt``:
+        the IDE was never asked to reply.
+        """
+        log.note('Communicating through WebSocket')
+        try:
+            self.send(payload_dict)
+            # Keep the historical phrasing for debug_finished so target tests
+            # that expect "Waiting for debug finished event" keep matching.
+            wait_label = wait_event.replace('_', ' ')
+            log.note(f'Waiting for {wait_label} event')
+            result = self.wait([('event', wait_event)])
+        except KeyboardInterrupt as e:
+            raise WebSocketWaitInterrupted from e
+        log.note('Communications through WebSocket is finished')
+        return result
 
     def close(self) -> None:
         self._impl.close()

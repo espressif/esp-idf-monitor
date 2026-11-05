@@ -88,6 +88,12 @@ def run_make(
         p.wait()
     except KeyboardInterrupt:
         p.wait()
+    except BaseException:
+        # SIGTERM in Command-Stream Mode may reach only the monitor. Exiting
+        # now would leave the build running and holding the serial port.
+        log.note(f'Waiting for {" ".join(popen_args)} to finish before exiting...')
+        p.wait()
+        raise
     if p.returncode != 0:
         if command_stream_mode:
             # cannot prompt for the next action without a TTY on stdin
