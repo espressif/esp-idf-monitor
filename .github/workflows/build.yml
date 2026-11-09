@@ -47,6 +47,12 @@ jobs:
           azure-tenant-id: ${{ secrets.AZURE_TENANT_ID }}
           azure-keyvault-uri: ${{ secrets.AZURE_KEYVAULT_URI }}
           azure-keyvault-cert-name: ${{ secrets.AZURE_KEYVAULT_CERT_NAME }}
+          macos-signing-identity: ${{ secrets.MACOS_CS_IDENTITY_ID }}
+          macos-certificate: ${{ secrets.MACOS_CS_CERTIFICATE }}
+          macos-certificate-pwd: ${{ secrets.MACOS_CS_CERTIFICATE_PWD }}
+          notarization-username: ${{ secrets.MACOS_CS_APPLE_ID }}
+          notarization-password: ${{ secrets.MACOS_CS_APP_SPECIFIC_PASSWORD }}
+          notarization-team-id: ${{ secrets.MACOS_CS_APPLE_TEAM_ID }}
 
       - name: Add license and readme
         shell: bash
