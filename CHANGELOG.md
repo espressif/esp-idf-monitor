@@ -21,6 +21,29 @@
 <hr>
 
 
+## v1.11.0 (2026-11-09)
+
+### ✨ New Features
+
+- **ide**: Delegate flash to IDE when it opts in *(Peter Dragun - c31b019)*
+
+### 🐛 Bug Fixes
+
+- **ide**: Report WebSocket failures without a traceback *(Peter Dragun - be6c900)*
+- **ide**: Release serial port before gdb_stub handoff *(Peter Dragun - bf2c1ca)*
+- Declare the license without deprecated metadata *(Peter Dragun - a899b0f)*
+- preserve colors in monitor log output *(Peter Dragun - 7147c2a)*
+- Exclude test files from packaging *(Peter Dragun - b09c554)*
+
+### 📖 Documentation
+
+- Add contribution guide and agent instructions *(Roland Dobai - af94024)*
+
+### 🔧 Code Refactoring
+
+- Rename non-interactive command mode to Command-Stream Mode *(Peter Dragun - 24a215d)*
+
+
 ## v1.10.0 (2026-08-27)
 
 ### ✨ New Features
