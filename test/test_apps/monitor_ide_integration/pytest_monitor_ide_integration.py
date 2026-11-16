@@ -6,55 +6,84 @@ import logging
 import multiprocessing
 import os
 import re
+import threading
+import time
 from typing import Dict
 from typing import List
+from typing import Optional
 
 import pexpect
 import pytest
 from pytest_embedded import Dut
-from SimpleWebSocketServer import SimpleWebSocketServer
-from SimpleWebSocketServer import WebSocket
+from websockets.sync.server import ServerConnection
+from websockets.sync.server import serve
+
+# websockets 13 renamed this class to Server. 11.x, the last release that
+# installs on Python 3.7, still exports WebSocketServer.
+try:
+    from websockets.sync.server import Server
+except ImportError:
+    from websockets.sync.server import WebSocketServer as Server
 
 
-class IDEWSProtocol(WebSocket):
-    def handleMessage(self) -> None:
-        try:
-            j = json.loads(self.data)
-        except Exception as e:
-            logging.info(f'Server ignores error: {e}')
-            return
-        event = j.get('event')
-        payload: Dict[str, object]
-        if event and 'prog' in j and ((event == 'gdb_stub' and 'port' in j) or (event == 'coredump' and 'file' in j)):
-            payload = {'event': 'debug_finished'}
-            self.sendMessage(json.dumps(payload))
-            logging.info(f'Server sent: {payload}')
-        elif event == 'flash' and 'port' in j and 'target' in j and 'full' in j:
-            payload = {'event': 'flash_finished', 'success': True}
-            self.sendMessage(json.dumps(payload))
-            logging.info(f'Server sent: {payload}')
-        else:
-            logging.info(f'Server received: {j}')
+def _reply_for(message: str) -> Optional[str]:
+    """Return the IDE reply for one monitor event, or None to stay silent."""
+    try:
+        parsed = json.loads(message)
+    except Exception as e:
+        logging.info(f'Server ignores error: {e}')
+        return None
+    if not isinstance(parsed, dict):
+        logging.info(f'Server received: {parsed}')
+        return None
 
-    def handleConnected(self) -> None:
-        logging.info(f'{self.address} connected to server')
+    event = parsed.get('event')
+    payload: Dict[str, object]
+    if (
+        event
+        and 'prog' in parsed
+        and ((event == 'gdb_stub' and 'port' in parsed) or (event == 'coredump' and 'file' in parsed))
+    ):
+        payload = {'event': 'debug_finished'}
+    elif event == 'flash' and 'port' in parsed and 'target' in parsed and 'full' in parsed:
+        payload = {'event': 'flash_finished', 'success': True}
+    else:
+        logging.info(f'Server received: {parsed}')
+        return None
 
-    def handleClose(self) -> None:
-        logging.info(f'{self.address} closed the connection')
+    logging.info(f'Server sent: {payload}')
+    return json.dumps(payload)
+
+
+def _handle_connection(websocket: ServerConnection) -> None:
+    # Snapshot the peer address. getpeername() fails after the socket closes.
+    address = websocket.remote_address
+    logging.info(f'{address} connected to server')
+    try:
+        for message in websocket:
+            if not isinstance(message, str):
+                continue
+            reply = _reply_for(message)
+            if reply is not None:
+                websocket.send(reply)
+    finally:
+        logging.info(f'{address} closed the connection')
 
 
 class WebSocketServer:
     HOST = '127.0.0.1'
 
     def run(self, port) -> None:
-        # port=None -> pick random available port
-        server = SimpleWebSocketServer(host=self.HOST, port=None, websocketclass=IDEWSProtocol)
-        _, port.value = server.serversocket.getsockname()
+        # port 0 -> the OS picks an available port
+        with serve(_handle_connection, self.HOST, 0, compression=None) as server:
+            _, port.value = server.socket.getsockname()
+            watcher = threading.Thread(target=self._shutdown_when_stopped, args=(server,), daemon=True)
+            watcher.start()
+            server.serve_forever()
 
-        while not self.exit_event.is_set():
-            server.serveonce()
-
-        server.close()
+    def _shutdown_when_stopped(self, server: Server) -> None:
+        self.exit_event.wait()
+        server.shutdown()
 
     def __init__(self) -> None:
         # create a shared integer ('i') with a default value 0
@@ -73,6 +102,12 @@ class WebSocketServer:
 @pytest.fixture(scope='module')
 def webSocketServer():
     server = WebSocketServer()
+    deadline = time.monotonic() + 5
+    while server.port.value == 0:
+        if time.monotonic() > deadline:
+            server.teardown()
+            raise RuntimeError('WebSocket test server did not bind a port')
+        time.sleep(0.05)
     yield server
     server.teardown()
 

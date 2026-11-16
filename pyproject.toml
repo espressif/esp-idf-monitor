@@ -61,7 +61,7 @@ ide = [
     "websocket-client; python_version < '3.8'",
 ]
 target_test = [
-    'SimpleWebSocketServer',
+    'websockets>=11',
     'pytest',
     'pytest_embedded',
     'pytest_embedded_idf',
