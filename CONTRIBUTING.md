@@ -31,7 +31,37 @@ pytest host_test
 - Some hooks fix files in place and then fail. Review and stage the changes, then commit again.
 - The package must run on the oldest Python version that `requires-python` in `pyproject.toml` allows. The ruff and mypy hooks check the code against that version and reject newer syntax. The mypy hook also rejects newer standard library functions. It does not check the bodies of functions without type annotations. In those functions, check standard library calls yourself or add type annotations.
 - On Linux and macOS, `test_binary_logging` fails unless `xtensa-esp32-elf-addr2line` is on `PATH`. Running ESP-IDF's export script in the same shell adds it.
-- You do not need hardware. Maintainers run the tests in `test/test_apps` on ESP32 boards before merging.
+- You do not need hardware for the host tests. Maintainers run the tests in `test/test_apps` on an ESP32 before merging. If you have a board, see [Target Tests (Optional)](#target-tests-optional).
+
+### Target Tests (Optional)
+
+The apps under `test/test_apps` need an exported ESP-IDF environment in the same shell, so that `idf.py` and the toolchain are on `PATH`. Use an original ESP32. The build rules in `test/.build-test-rules.yml` enable `monitor_addr_lookup` and `monitor_ide_integration` only for that chip.
+
+From the repository root, install the extras that CI uses for these tests. The `ide` extra is required for the IDE-integration app (`--ws`):
+
+```sh
+pip install -e ".[ide,target_test]"
+```
+
+Build the test apps from `test/`, not from `test/test_apps/`:
+
+```sh
+cd test
+python -m idf_build_apps build -v -p . --recursive --target esp32 \
+  --config "sdkconfig.ci.*=" --build-dir "build_@t_@w" \
+  --manifest-rootpath . --manifest-file .build-test-rules.yml
+```
+
+`build_@t_@w` expands to `build_<target>_<config>`, which matches the layout that pytest looks for.
+
+Then run the tests:
+
+```sh
+cd test_apps
+pytest --target esp32
+```
+
+Logs are under `test/test_apps/pytest_embedded_log/<date-time>/<test-name>/`. Each test writes `monitor.txt` there, next to the flash and serial logs from pytest-embedded.
 
 ## Commit Messages
 
